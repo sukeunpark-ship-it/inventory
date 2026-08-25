@@ -3628,9 +3628,9 @@ function printStatement(data) {
           <td colspan="2" class="label-cell">성명</td>
           <td colspan="3" class="value-cell">박귀환, 박정화 <img src="data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAAYACoDASIAAhEBAxEB/8QAGgAAAwEAAwAAAAAAAAAAAAAAAAQGBQEHCP/EACwQAAEEAQMBBwMFAAAAAAAAAAECAwQRAAUSITETFCJBUWHBBjJxBxUkM1L/xAAYAQADAQEAAAAAAAAAAAAAAAAAAQQDBf/EABoRAAMBAQEBAAAAAAAAAAAAAAABAgMhEUH/2gAMAwEAAhEDEQA/APZKiAMi9d1ubKfdjae+I7TfG5P9jvWyCeEgV+TlRrQWdJlhsqCyyraUmjdeWRU2M006y+bcYdYCm9tKSRRrkj8fOJm+CT6xB9hUl5TqnHFqtJO5xSlbBdp+8G6rkDyOOQZ+tQZhehyO9wSVfx3nSopocp3K8SSAOSeLNZmRVtpjyFSHVJ7JSWkBB3dp4gASUgc8EV09bxhMlp6N3ktGEhwqKm3j4TRtO6rH+/kYcLaj54dh6PPY1OE1Mj3scHQ8FJHBB9wQRj2SH6ZtONafLBUpTfeTtJNgnandXtfzldxgjnaSpppHChxkTr+g6pG3q0UhxharUzupbYJshBPBSSb28el10MMPo86cvhiNfugjojyNN1BIU4QtpLLmxKOoIAtJN+QxrRvp7UtRYYRIhHTkJ+5alCyPOkep5NmuDVGhhhgVaa0p9RfabDYgRGokdJS22KSCbPuSfMnreNVhhjIn1n//2Q==" style="width:28px;height:28px;vertical-align:middle;margin-left:4px;opacity:0.85;"></td>
           <td colspan="2" class="label-cell">상호</td>
+          <td colspan="3" class="value-cell bold">${dest||''}</td>
           <td colspan="2" class="label-cell">성명</td>
-          <td colspan="2" class="value-cell">${destCeo}</td>
-          <td colspan="4" class="value-cell bold">${dest||''}</td>
+          <td colspan="3" class="value-cell">${destCeo}</td>
         </tr>
         <!-- 5행: 소재지 -->
         <tr>
@@ -3751,7 +3751,19 @@ function printStatement(data) {
   <hr class="divider">
   ${makeSlip('공급받는자 보관용')}
 </div>
-<script>window.onload=function(){window.print();}<\/script>
+<style>
+  .print-btn-bar{position:fixed;bottom:20px;right:20px;z-index:999;display:flex;gap:8px;}
+  .print-btn-bar button{padding:10px 20px;font-size:14px;font-weight:600;border:none;border-radius:6px;cursor:pointer;}
+  .btn-print-now{background:#1a6fd4;color:#fff;}
+  .btn-print-now:hover{background:#155bb5;}
+  .btn-close-win{background:#666;color:#fff;}
+  .btn-close-win:hover{background:#444;}
+  @media print{.print-btn-bar{display:none;}}
+<\/style>
+<div class="print-btn-bar">
+  <button class="btn-close-win" onclick="window.close()">✕ 닫기</button>
+  <button class="btn-print-now" onclick="window.print()">🖨 인쇄</button>
+</div>
 </body></html>`;
 
   const w = window.open('', '_blank', 'width=900,height:950');
@@ -4440,18 +4452,6 @@ async function loadFxSettings() {
       if(data.cache)    window._fxCache   = data.cache;
     }
   } catch(e) { console.warn('환율 설정 로드 실패:', e); }
-  // 월 교정: 8월→7월, 7월→6월 (순서 중요: 7월 먼저 이동 후 8월 이동)
-  (function fixFxMonths(){
-    const c = window._fxCache;
-    let changed = false;
-    if(c['2026-07'] !== undefined){
-      c['2026-06'] = c['2026-07']; delete c['2026-07']; changed = true;
-    }
-    if(c['2026-08'] !== undefined){
-      c['2026-07'] = c['2026-08']; delete c['2026-08']; changed = true;
-    }
-    if(changed) saveFxCache();
-  })();
 }
 window._loadFxSettings = loadFxSettings;
 
