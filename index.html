@@ -87,6 +87,11 @@
     if(acctBtn) acctBtn.style.display = isSuperAdmin ? 'block' : 'none';
     const permBtn = document.getElementById('finance-perm-btn-wrap');
     if(permBtn) permBtn.style.display = isSuperAdmin ? 'block' : 'none';
+    // 발주·예상 섹션: 최고 관리자만 표시
+    ['nav-section-orders','nav-orders','nav-forecast','nav-stockalert'].forEach(id => {
+      const el = document.getElementById(id);
+      if(el) el.style.display = isSuperAdmin ? '' : 'none';
+    });
   }
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -668,10 +673,10 @@ textarea.form-control{min-height:64px;resize:vertical;}
       <div class="nav-item" onclick="showTab('pricehistory')" id="nav-pricehistory"><span class="icon">↻</span> 출고 단가 변동 이력</div>
       <div class="nav-item" onclick="showTab('buypricehistory')" id="nav-buypricehistory"><span class="icon">↻</span> 입고 단가 변동 이력</div>
       <div class="nav-item" onclick="showTab('lgpricehistory')" id="nav-lgpricehistory"><span class="icon">↻</span> LG인정가 변동 이력</div>
-      <div class="nav-section">발주·예상</div>
-      <div class="nav-item" onclick="showTab('orders')" id="nav-orders"><span class="icon">📋</span> 발주 관리</div>
-      <div class="nav-item" onclick="showTab('forecast')" id="nav-forecast"><span class="icon">📅</span> 예상 출고 물량</div>
-      <div class="nav-item" onclick="showTab('stockalert')" id="nav-stockalert"><span class="icon">🔔</span> 재고 부족 알림 <span id="alert-badge" class="nav-badge" style="display:none">0</span></div>
+      <div class="nav-section" id="nav-section-orders" style="display:none">발주·예상</div>
+      <div class="nav-item" onclick="showTab('orders')" id="nav-orders" style="display:none"><span class="icon">📋</span> 발주 관리</div>
+      <div class="nav-item" onclick="showTab('forecast')" id="nav-forecast" style="display:none"><span class="icon">📅</span> 예상 출고 물량</div>
+      <div class="nav-item" onclick="showTab('stockalert')" id="nav-stockalert" style="display:none"><span class="icon">🔔</span> 재고 부족 알림 <span id="alert-badge" class="nav-badge" style="display:none">0</span></div>
       <div class="nav-section">파일 보관함</div>
       <div class="nav-item" onclick="showTab('filevault')" id="nav-filevault"><span class="icon">📁</span> 파일 보관함</div>
     </nav>
