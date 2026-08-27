@@ -4455,6 +4455,14 @@ async function loadFxSettings() {
       if(data.apiKey)   window._fxApiKey  = data.apiKey;
       if(data.proxyUrl) window._fxProxyUrl = data.proxyUrl;
       if(data.cache)    window._fxCache   = data.cache;
+      // 잘못 저장된 당월 이후 환율 자동 정리 (구 fixFxMonths 잔재 제거)
+      const now = new Date();
+      const curYm = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+      let cleaned = false;
+      Object.keys(window._fxCache).forEach(ym => {
+        if(ym >= curYm) { delete window._fxCache[ym]; cleaned = true; }
+      });
+      if(cleaned) saveFxCache();
     }
   } catch(e) { console.warn('환율 설정 로드 실패:', e); }
 }
