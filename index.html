@@ -59,7 +59,8 @@
 
   /* ── 로그인 상태 감지 ── */
   const SUPER_ADMIN = 'sk.park@unisolec.com'; // 최고 관리자 (항상 재무 접근 가능 + 권한 설정 가능)
-  window._financeEmails = [SUPER_ADMIN]; // 기본값, Firestore에서 갱신됨
+  const FINANCE_ALWAYS = [SUPER_ADMIN]; // 항상 재무 접근 허용 계정
+  window._financeEmails = [...FINANCE_ALWAYS]; // 기본값, Firestore에서 갱신됨
 
   async function loadFinanceAccess() {
     try {
@@ -6139,9 +6140,9 @@ async function openFinancePermModal() {
 
   listEl.innerHTML = emails.map(e => `
     <label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--border);font-size:13px;cursor:pointer;">
-      <input type="checkbox" class="fp-check" value="${e}" ${window._financeEmails.includes(e)?'checked':''} ${e==='sk.park@unisolec.com'?'checked disabled':''}>
+      <input type="checkbox" class="fp-check" value="${e}" ${window._financeEmails.includes(e)?'checked':''} ${e===SUPER_ADMIN?'checked disabled':''}>
       <span>${e}</span>
-      ${e==='sk.park@unisolec.com'?'<span style="font-size:10px;color:var(--text3);">(관리자 — 항상 허용)</span>':''}
+      ${e===SUPER_ADMIN?'<span style="font-size:10px;color:var(--text3);">(관리자 — 항상 허용)</span>':''}
     </label>
   `).join('') + `
     <div style="margin-top:10px;display:flex;gap:6px;align-items:center;">
@@ -6175,7 +6176,7 @@ async function saveFinancePerm() {
   const errEl = document.getElementById('finance-perm-error');
   const checks = [...document.querySelectorAll('.fp-check')];
   const emails = checks.filter(c=>c.checked).map(c=>c.value);
-  if(!emails.includes('sk.park@unisolec.com')) emails.push('sk.park@unisolec.com');
+  if(!emails.includes(SUPER_ADMIN)) emails.push(SUPER_ADMIN);
   btn.disabled = true; btn.textContent = '저장 중...';
   try {
     await window._db_setSetting('finance-access', { emails });
