@@ -5064,8 +5064,8 @@ function addPartnerTag() {
   if(existing.includes(name)) { showToast('⚠ 이미 추가된 거래처입니다.'); input.value=''; return; }
   const tag = document.createElement('span');
   tag.dataset.name = name;
-  tag.style.cssText = 'display:inline-flex;align-items:center;gap:4px;background:var(--primary);color:#fff;padding:3px 10px;border-radius:20px;font-size:12px;';
-  tag.innerHTML = `${name} <button type="button" onclick="removePartnerTag(this)" style="background:none;border:none;color:#fff;cursor:pointer;padding:0;font-size:14px;line-height:1;">×</button>`;
+  tag.style.cssText = 'display:inline-flex;align-items:center;gap:4px;background:#2563eb;color:#ffffff;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:500;';
+  tag.innerHTML = `${name} <button type="button" onclick="removePartnerTag(this)" style="background:none;border:none;color:#ffffff;cursor:pointer;padding:0 0 0 4px;font-size:15px;line-height:1;opacity:0.85;">×</button>`;
   tags.appendChild(tag);
   input.value='';
   input.focus();
