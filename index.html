@@ -102,9 +102,6 @@
     if(histPreviewBtn) histPreviewBtn.style.display = isSuperAdmin ? '' : 'none';
     const histFixBtn = document.getElementById('hist-fix-partner-btn');
     if(histFixBtn) histFixBtn.style.display = isSuperAdmin ? '' : 'none';
-    // AUK 품목 일괄 등록 버튼: 최고 관리자만 표시
-    const aukImportBtn = document.getElementById('auk-bulk-import-btn');
-    if(aukImportBtn) aukImportBtn.style.display = isSuperAdmin ? '' : 'none';
     // 품목 엑셀 일괄 등록 버튼: 최고 관리자만 표시
     const itemsExcelTplBtn = document.getElementById('items-excel-template-btn');
     if(itemsExcelTplBtn) itemsExcelTplBtn.style.display = isSuperAdmin ? '' : 'none';
@@ -115,6 +112,16 @@
     if(pricesExcelTplBtn) pricesExcelTplBtn.style.display = isSuperAdmin ? '' : 'none';
     const pricesExcelImportBtn = document.getElementById('prices-excel-import-btn');
     if(pricesExcelImportBtn) pricesExcelImportBtn.style.display = isSuperAdmin ? '' : 'none';
+    // 입고 엑셀 일괄 등록 버튼: 최고 관리자만 표시
+    const inExcelTplBtn = document.getElementById('in-excel-template-btn');
+    if(inExcelTplBtn) inExcelTplBtn.style.display = isSuperAdmin ? '' : 'none';
+    const inExcelImportBtn = document.getElementById('in-excel-import-btn');
+    if(inExcelImportBtn) inExcelImportBtn.style.display = isSuperAdmin ? '' : 'none';
+    // 출고 엑셀 일괄 등록 버튼: 최고 관리자만 표시
+    const outExcelTplBtn = document.getElementById('out-excel-template-btn');
+    if(outExcelTplBtn) outExcelTplBtn.style.display = isSuperAdmin ? '' : 'none';
+    const outExcelImportBtn = document.getElementById('out-excel-import-btn');
+    if(outExcelImportBtn) outExcelImportBtn.style.display = isSuperAdmin ? '' : 'none';
     // 명세서 인쇄 버튼: 최고 관리자만 표시
     const printOutBtn = document.getElementById('btn-print-out');
     if(printOutBtn) printOutBtn.style.display = isSuperAdmin ? '' : 'none';
@@ -781,7 +788,14 @@ textarea.form-control{min-height:64px;resize:vertical;}
       <!-- 입고 -->
       <div class="tab-content" id="tab-in">
         <div class="card">
-          <div class="card-header"><div class="card-title" style="color:var(--green)">↓ 입고 등록</div></div>
+          <div class="card-header">
+            <div class="card-title" style="color:var(--green)">↓ 입고 등록</div>
+            <div style="display:flex;gap:8px;">
+              <button id="in-excel-template-btn" class="btn btn-secondary" onclick="downloadInExcelTemplate()" style="display:none;font-size:12px;">📋 엑셀 양식</button>
+              <button id="in-excel-import-btn" class="btn btn-info" onclick="document.getElementById('in-excel-upload').click()" style="display:none;font-size:12px;">📥 엑셀 일괄 등록</button>
+              <input type="file" id="in-excel-upload" accept=".xlsx,.xls" style="display:none;" onchange="importInFromExcel(this)">
+            </div>
+          </div>
           <div class="card-body">
             <div class="form-grid">
               <div class="form-group"><label class="form-label">품목 선택 * <button type="button" onclick="openScanner('in')" style="margin-left:6px;border:1px solid var(--border2);background:var(--surface2);border-radius:6px;padding:1px 8px;font-size:11px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">📷 스캔</button></label><select class="form-control" id="in-item"></select></div>
@@ -817,7 +831,14 @@ textarea.form-control{min-height:64px;resize:vertical;}
       <!-- 출고 -->
       <div class="tab-content" id="tab-out">
         <div class="card">
-          <div class="card-header"><div class="card-title" style="color:var(--red)">↑ 출고 등록</div></div>
+          <div class="card-header">
+            <div class="card-title" style="color:var(--red)">↑ 출고 등록</div>
+            <div style="display:flex;gap:8px;">
+              <button id="out-excel-template-btn" class="btn btn-secondary" onclick="downloadOutExcelTemplate()" style="display:none;font-size:12px;">📋 엑셀 양식</button>
+              <button id="out-excel-import-btn" class="btn btn-info" onclick="document.getElementById('out-excel-upload').click()" style="display:none;font-size:12px;">📥 엑셀 일괄 등록</button>
+              <input type="file" id="out-excel-upload" accept=".xlsx,.xls" style="display:none;" onchange="importOutFromExcel(this)">
+            </div>
+          </div>
           <div class="card-body">
             <div class="form-grid">
               <div class="form-group"><label class="form-label">품목 선택 * <button type="button" onclick="openScanner('out')" style="margin-left:6px;border:1px solid var(--border2);background:var(--surface2);border-radius:6px;padding:1px 8px;font-size:11px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">📷 스캔</button></label><select class="form-control" id="out-item"></select></div>
@@ -971,8 +992,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
             <input class="form-control" type="text" id="items-search" placeholder="품목코드, 품목명, MAKER 검색..." oninput="renderItemsTab()" style="max-width:280px;">
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
-            <button id="auk-bulk-import-btn" class="btn btn-warning" onclick="bulkImportAUKItems()" style="display:none;font-size:12px;">📥 AUK 7품목 등록</button>
-            <button id="items-excel-template-btn" class="btn btn-secondary" onclick="downloadItemsExcelTemplate()" style="display:none;font-size:12px;">📋 엑셀 양식</button>
+<button id="items-excel-template-btn" class="btn btn-secondary" onclick="downloadItemsExcelTemplate()" style="display:none;font-size:12px;">📋 엑셀 양식</button>
             <button id="items-excel-import-btn" class="btn btn-info" onclick="document.getElementById('items-excel-upload').click()" style="display:none;font-size:12px;">📥 엑셀 일괄 등록</button>
             <input type="file" id="items-excel-upload" accept=".xlsx,.xls" style="display:none;" onchange="importItemsFromExcel(this)">
             <button class="btn btn-primary" onclick="openItemModal()">＋ 품목 추가</button>
@@ -5884,6 +5904,159 @@ async function importPricesFromExcel(input) {
           }
         });
         showToast(`✓ ${added}개 단가 등록 완료${failed>0?' (실패 '+failed+'건)':''}${errors.length>0?' / '+errors.length+'건 건너뜀':''}`);
+      }finally{if(btn){btn.disabled=false;btn.textContent='📥 엑셀 일괄 등록';}}
+    }catch(ex){console.error(ex);showToast('⚠ 파일 읽기 오류: '+ex.message);}
+  };
+  reader.readAsBinaryString(file);
+}
+
+// ── 입고 엑셀 일괄 등록 ──
+function downloadInExcelTemplate() {
+  if(typeof XLSX==='undefined'){showToast('⚠ 엑셀 라이브러리 로딩 중입니다.');return;}
+  const headers=['품목명*','수량*','입고일자*(YYYY-MM-DD)','공급업체','입고단가(비우면 기본단가)','통화(KRW/USD)','비고'];
+  const example=['R903H1-04GX',100,'2026-01-15','AUK Korea',209,'KRW','1월 정기 입고'];
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([headers,example]);
+  ws['!cols']=headers.map((_,i)=>({wch:i===0?22:i===2?20:i===3?16:12}));
+  XLSX.utils.book_append_sheet(wb,ws,'입고등록');
+  XLSX.writeFile(wb,'입고_일괄등록_양식.xlsx');
+}
+
+async function importInFromExcel(input) {
+  const file=input.files[0]; if(!file)return; input.value='';
+  if(typeof XLSX==='undefined'){showToast('⚠ 엑셀 라이브러리 로딩 중입니다.');return;}
+  const currentEmail=window._auth&&window._auth.currentUser&&window._auth.currentUser.email;
+  if(currentEmail!=='sk.park@unisolec.com'){showToast('⚠ 관리자만 사용 가능합니다.');return;}
+  const reader=new FileReader();
+  reader.onload=async(e)=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(rows.length<2){showToast('⚠ 데이터가 없습니다.');return;}
+      const toProcess=[]; const errors=[];
+      for(let i=1;i<rows.length;i++){
+        const r=rows[i];
+        const itemName=String(r[0]||'').trim();
+        const qty=parseInt(r[1])||0;
+        const date=String(r[2]||'').trim();
+        if(!itemName&&!qty)continue;
+        if(!itemName){errors.push(`행 ${i+1}: 품목명 누락`);continue;}
+        if(!qty||qty<1){errors.push(`행 ${i+1}: 수량 오류`);continue;}
+        if(!date){errors.push(`행 ${i+1}: 입고일자 누락`);continue;}
+        const item=getItem(itemName);
+        if(!item){errors.push(`행 ${i+1}: 품목 없음 (${itemName})`);continue;}
+        toProcess.push({
+          item, itemName, qty, date,
+          supplier:String(r[3]||'').trim(),
+          price:parseFloat(r[4])||0,
+          currency:String(r[5]||'KRW').trim()||'KRW',
+          note:String(r[6]||'').trim()
+        });
+      }
+      if(toProcess.length===0){showToast(`등록할 입고가 없습니다.${errors.length>0?' ('+errors.length+'건 오류)':''}`);if(errors.length)console.warn(errors.join('\n'));return;}
+      if(!confirm(`${toProcess.length}건 입고를 등록합니다${errors.length>0?' ('+errors.length+'건 건너뜀)':''}.\n계속하시겠습니까?`))return;
+      const btn=document.getElementById('in-excel-import-btn');
+      if(btn){btn.disabled=true;btn.textContent='등록 중...';}
+      // 재고 로컬 추적
+      const stockMap={};
+      toProcess.forEach(p=>{ if(!(p.item.code in stockMap)) stockMap[p.item.code]=p.item.stock; });
+      let added=0,failed=0;
+      try{
+        await withSync(async()=>{
+          for(const p of toProcess){
+            try{
+              stockMap[p.item.code]+=p.qty;
+              const newStock=stockMap[p.item.code];
+              const amount=p.price*p.qty;
+              await window._db_updateItem(p.item.code,{stock:newStock});
+              await window._db_addHistoryRef({date:p.date,type:'in',itemName:p.itemName,qty:p.qty,partner:p.supplier,supplier:p.supplier,afterStock:newStock,note:p.note,price:p.price,amount,currency:p.currency,createdBy:getCurrentUserLabel()});
+              await window._db_addFinance({date:p.date,type:'매입',itemName:p.itemName,qty:p.qty,price:p.price,amount,partner:p.supplier,paid:'paid',note:p.note,historyId:'',createdBy:getCurrentUserLabel()});
+              added++;
+            }catch(ex){console.error('입고 등록 실패:',p,ex);failed++;}
+          }
+        });
+        showToast(`✓ ${added}건 입고 등록 완료${failed>0?' (실패 '+failed+'건)':''}${errors.length>0?' / '+errors.length+'건 건너뜀':''}`);
+      }finally{if(btn){btn.disabled=false;btn.textContent='📥 엑셀 일괄 등록';}}
+    }catch(ex){console.error(ex);showToast('⚠ 파일 읽기 오류: '+ex.message);}
+  };
+  reader.readAsBinaryString(file);
+}
+
+// ── 출고 엑셀 일괄 등록 ──
+function downloadOutExcelTemplate() {
+  if(typeof XLSX==='undefined'){showToast('⚠ 엑셀 라이브러리 로딩 중입니다.');return;}
+  const headers=['품목명*','수량*','출고일자*(YYYY-MM-DD)','출고처','출고단가(비우면 등록단가)','통화(KRW/USD)','발주일자(YYYY-MM-DD)','정산월(YYYY-MM)','비고'];
+  const example=['R903H1-04GX',500,'2026-01-20','LG전자',220.1,'KRW','2026-01-10','2026-01','1월 출고'];
+  const wb=XLSX.utils.book_new();
+  const ws=XLSX.utils.aoa_to_sheet([headers,example]);
+  ws['!cols']=headers.map((_,i)=>({wch:i===0?22:i===2||i===6?20:i===3?14:12}));
+  XLSX.utils.book_append_sheet(wb,ws,'출고등록');
+  XLSX.writeFile(wb,'출고_일괄등록_양식.xlsx');
+}
+
+async function importOutFromExcel(input) {
+  const file=input.files[0]; if(!file)return; input.value='';
+  if(typeof XLSX==='undefined'){showToast('⚠ 엑셀 라이브러리 로딩 중입니다.');return;}
+  const currentEmail=window._auth&&window._auth.currentUser&&window._auth.currentUser.email;
+  if(currentEmail!=='sk.park@unisolec.com'){showToast('⚠ 관리자만 사용 가능합니다.');return;}
+  const reader=new FileReader();
+  reader.onload=async(e)=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'binary'});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+      if(rows.length<2){showToast('⚠ 데이터가 없습니다.');return;}
+      const toProcess=[]; const errors=[];
+      // 재고 로컬 추적 (미리 파싱하여 재고 체크)
+      const stockMap={};
+      for(let i=1;i<rows.length;i++){
+        const r=rows[i];
+        const itemName=String(r[0]||'').trim();
+        const qty=parseInt(r[1])||0;
+        const date=String(r[2]||'').trim();
+        if(!itemName&&!qty)continue;
+        if(!itemName){errors.push(`행 ${i+1}: 품목명 누락`);continue;}
+        if(!qty||qty<1){errors.push(`행 ${i+1}: 수량 오류`);continue;}
+        if(!date){errors.push(`행 ${i+1}: 출고일자 누락`);continue;}
+        const item=getItem(itemName);
+        if(!item){errors.push(`행 ${i+1}: 품목 없음 (${itemName})`);continue;}
+        if(!(item.code in stockMap)) stockMap[item.code]=item.stock;
+        if(stockMap[item.code]<qty){errors.push(`행 ${i+1}: 재고 부족 (${itemName}, 현재 ${stockMap[item.code]})`);continue;}
+        stockMap[item.code]-=qty;
+        toProcess.push({
+          item, itemName, qty, date,
+          dest:String(r[3]||'').trim(),
+          price:parseFloat(r[4])||0,
+          currency:String(r[5]||'KRW').trim()||'KRW',
+          orderDate:String(r[6]||'').trim(),
+          billMonth:String(r[7]||'').trim(),
+          note:String(r[8]||'').trim()
+        });
+      }
+      if(toProcess.length===0){showToast(`등록할 출고가 없습니다.${errors.length>0?' ('+errors.length+'건 오류)':''}`);if(errors.length)console.warn(errors.join('\n'));return;}
+      if(!confirm(`${toProcess.length}건 출고를 등록합니다${errors.length>0?' ('+errors.length+'건 건너뜀)':''}.\n계속하시겠습니까?`))return;
+      const btn=document.getElementById('out-excel-import-btn');
+      if(btn){btn.disabled=true;btn.textContent='등록 중...';}
+      // 재고 재계산 (stockMap에는 이미 차감된 최종값이 있으므로 순서대로 처리)
+      const runningStock={};
+      toProcess.forEach(p=>{ if(!(p.item.code in runningStock)) runningStock[p.item.code]=p.item.stock; });
+      let added=0,failed=0;
+      try{
+        await withSync(async()=>{
+          for(const p of toProcess){
+            try{
+              runningStock[p.item.code]-=p.qty;
+              const newStock=runningStock[p.item.code];
+              const amount=p.price*p.qty;
+              await window._db_updateItem(p.item.code,{stock:newStock});
+              await window._db_addHistoryRef({date:p.date,type:'out',itemName:p.itemName,qty:p.qty,partner:p.dest,afterStock:newStock,note:p.note,price:p.price,amount,billMonth:p.billMonth,orderDate:p.orderDate,currency:p.currency,createdBy:getCurrentUserLabel()});
+              await window._db_addFinance({date:p.date,type:'매출',itemName:p.itemName,qty:p.qty,price:p.price,amount,partner:p.dest,paid:'paid',note:p.note,historyId:'',createdBy:getCurrentUserLabel()});
+              added++;
+            }catch(ex){console.error('출고 등록 실패:',p,ex);failed++;}
+          }
+        });
+        showToast(`✓ ${added}건 출고 등록 완료${failed>0?' (실패 '+failed+'건)':''}${errors.length>0?' / '+errors.length+'건 건너뜀':''}`);
       }finally{if(btn){btn.disabled=false;btn.textContent='📥 엑셀 일괄 등록';}}
     }catch(ex){console.error(ex);showToast('⚠ 파일 읽기 오류: '+ex.message);}
   };
