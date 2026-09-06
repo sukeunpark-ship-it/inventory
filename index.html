@@ -5772,6 +5772,20 @@ async function bulkImportAUKItems() {
       for(const item of toAdd) {
         try {
           await window._db_addItem({...item, createdBy: getCurrentUserLabel()});
+          // 입고단가 최초 이력
+          if(item.buyPrice) await window._db_addBuyPriceHistory({
+            itemCode: item.code, itemName: item.name, maker: item.maker||'',
+            changeDate: TODAY, applyDate: item.buyPriceDate||'',
+            oldPrice: 0, newPrice: item.buyPrice, changeRate: 0,
+            currency: item.buyCurrency||'KRW', changedBy: getCurrentUserLabel()
+          });
+          // LG인정가 최초 이력
+          if(item.sellPrice) await window._db_addLgPriceHistory({
+            itemCode: item.code, itemName: item.name, maker: item.maker||'',
+            changeDate: TODAY, applyDate: item.sellPriceDate||'',
+            oldPrice: 0, newPrice: item.sellPrice, changeRate: 0,
+            currency: item.sellCurrency||'KRW', changedBy: getCurrentUserLabel()
+          });
           added++;
         } catch(e) { console.error('AUK 품목 등록 실패:', item.code, e); failed++; }
       }
@@ -5782,6 +5796,19 @@ async function bulkImportAUKItems() {
             buyPriceDate: item.buyPriceDate,
             sellPriceDate: item.sellPriceDate,
             updatedBy: getCurrentUserLabel()
+          });
+          // 기존 품목도 이력이 없으면 최초 이력 추가
+          if(item.buyPrice) await window._db_addBuyPriceHistory({
+            itemCode: item.code, itemName: item.name, maker: item.maker||'',
+            changeDate: TODAY, applyDate: item.buyPriceDate||'',
+            oldPrice: 0, newPrice: item.buyPrice, changeRate: 0,
+            currency: item.buyCurrency||'KRW', changedBy: getCurrentUserLabel()
+          });
+          if(item.sellPrice) await window._db_addLgPriceHistory({
+            itemCode: item.code, itemName: item.name, maker: item.maker||'',
+            changeDate: TODAY, applyDate: item.sellPriceDate||'',
+            oldPrice: 0, newPrice: item.sellPrice, changeRate: 0,
+            currency: item.sellCurrency||'KRW', changedBy: getCurrentUserLabel()
           });
           updated++;
         } catch(e) { console.error('AUK 품목 업데이트 실패:', item.code, e); failed++; }
