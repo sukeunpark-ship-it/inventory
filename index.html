@@ -3410,7 +3410,7 @@ function openHistoryModal(id) {
   document.getElementById('history-modal').classList.add('open');
 }
 function closeHistoryModal(){ document.getElementById('history-modal').classList.remove('open'); }
-document.getElementById('history-modal').addEventListener('click',e=>{if(e.target===document.getElementById('history-modal'))closeHistoryModal();});
+// 이력 수정 모달은 배경 클릭으로 닫히지 않음 (실수 방지)
 
 async function saveHistoryEdit() {
   const id       = document.getElementById('hm-id').value;
@@ -5072,7 +5072,7 @@ function addPartnerTag() {
 }
 function removePartnerTag(btn) { btn.parentElement.remove(); }
 function closePriceModal(){ document.getElementById('price-modal').classList.remove('open'); }
-document.getElementById('price-modal').addEventListener('click',e=>{if(e.target===document.getElementById('price-modal'))closePriceModal();});
+// 단가 등록/수정 모달은 배경 클릭으로 닫히지 않음 (실수 방지)
 
 async function savePrice() {
   const itemName=document.getElementById('pm-item').value;
@@ -5502,7 +5502,7 @@ function openOrderModal(editId) {
   document.getElementById('order-modal').classList.add('open');
 }
 function closeOrderModal(){ document.getElementById('order-modal').classList.remove('open'); }
-document.getElementById('order-modal').addEventListener('click',e=>{if(e.target===document.getElementById('order-modal'))closeOrderModal();});
+// 발주 모달은 배경 클릭으로 닫히지 않음 (실수 방지)
 
 function calcOrderAmount(){
   const qty=parseInt(document.getElementById('om-qty').value)||0;
@@ -5635,7 +5635,7 @@ function openForecastModal(editId) {
   document.getElementById('forecast-modal').classList.add('open');
 }
 function closeForecastModal(){ document.getElementById('forecast-modal').classList.remove('open'); }
-document.getElementById('forecast-modal').addEventListener('click',e=>{if(e.target===document.getElementById('forecast-modal'))closeForecastModal();});
+// 발주예상 모달은 배경 클릭으로 닫히지 않음 (실수 방지)
 
 async function saveForecast(){
   const itemName=document.getElementById('fm-item').value;
@@ -5887,9 +5887,7 @@ function openCustomerModal(editId) {
   document.getElementById('customer-modal').classList.add('open');
 }
 function closeCustomerModal() { document.getElementById('customer-modal').classList.remove('open'); }
-document.getElementById('customer-modal').addEventListener('click',e=>{
-  if(e.target===document.getElementById('customer-modal')) closeCustomerModal();
-});
+// 거래처 추가/수정 모달은 배경 클릭으로 닫히지 않음 (실수 방지)
 
 async function saveCustomer() {
   const name = document.getElementById('cm-name').value.trim();
