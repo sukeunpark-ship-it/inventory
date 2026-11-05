@@ -815,8 +815,9 @@ textarea.form-control{min-height:64px;resize:vertical;}
               <div class="form-group"><label class="form-label">입고 금액</label><div class="form-control" id="in-amount" style="background:var(--surface2);color:var(--green);font-weight:600;">—</div></div>
               <input type="hidden" id="in-currency" value="KRW">
             </div>
+
             <div class="form-grid">
-              <div class="form-group"><label class="form-label">비고</label><input class="form-control" type="text" id="in-note2" placeholder="메모 (선택)"></div>
+              <div class="form-group"><label class="form-label">비고</label><textarea class="form-control" id="in-note2" placeholder="메모 (선택)" rows="3" style="resize:vertical;min-height:62px;"></textarea></div>
             </div>
             <div class="form-actions">
               <button class="btn btn-secondary" onclick="clearForm('in')">초기화</button>
@@ -881,7 +882,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
             </div>
             <div class="form-grid">
               <div class="form-group"><label class="form-label">인수자 <span style="font-size:10px;color:var(--text3);font-weight:400;">(명세서에 표시)</span></label><input class="form-control" type="text" id="out-receiver" placeholder="인수자 이름"></div>
-              <div class="form-group"><label class="form-label">비고</label><input class="form-control" type="text" id="out-note2" placeholder="메모 (선택)"></div>
+              <div class="form-group"><label class="form-label">비고</label><textarea class="form-control" id="out-note2" placeholder="메모 (선택)" rows="3" style="resize:vertical;min-height:62px;"></textarea></div>
             </div>
             <div class="form-actions">
               <button class="btn btn-secondary" onclick="clearForm('out')">초기화</button>
@@ -1436,8 +1437,8 @@ textarea.form-control{min-height:64px;resize:vertical;}
   <div class="modal" style="width:960px;max-width:96vw;">
     <div class="modal-title" id="modal-title">품목 추가</div>
     <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-      <div class="form-group"><label class="form-label">품목코드 *</label><input class="form-control" type="text" id="if-code" placeholder="ITM-009" oninput="checkDuplicateCode()"><div id="if-code-msg" style="font-size:11px;margin-top:3px;min-height:14px;"></div></div>
-      <div class="form-group"><label class="form-label">품목명 *</label><input class="form-control" type="text" id="if-name" placeholder="품목명"></div>
+      <div class="form-group"><label class="form-label">LG P/No *</label><input class="form-control" type="text" id="if-code" placeholder="EAE00220101" oninput="checkDuplicateCode()"><div id="if-code-msg" style="font-size:11px;margin-top:3px;min-height:14px;"></div></div>
+      <div class="form-group"><label class="form-label">Maker P/no (형명) *</label><input class="form-control" type="text" id="if-name" placeholder="품목명"></div>
     </div>
     <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;margin-bottom:14px;">
       <div class="form-group"><label class="form-label">단위 *</label><input class="form-control" type="text" id="if-unit" placeholder="개, 박스…"></div>
@@ -1474,6 +1475,12 @@ textarea.form-control{min-height:64px;resize:vertical;}
       <div class="form-group"><label class="form-label">품명 <span style="font-size:9px;color:var(--text3);font-weight:400;">분류/타입 · 마감내역서 표시용</span></label><input class="form-control" type="text" id="if-typename" placeholder="예: Film(Box) Capacitor, Varistor…"></div>
       <div class="form-group"><label class="form-label">박스당수량 (장입수량) <span style="font-size:9px;color:var(--text3);font-weight:400;">BOX 수 계산용</span></label><input class="form-control" type="number" id="if-boxqty" min="0" placeholder="예: 9200"></div>
       <div class="form-group"><label class="form-label">소박스 장입수량 <span style="font-size:9px;color:var(--text3);font-weight:400;">소박스 기준</span></label><input class="form-control" type="number" id="if-smallboxqty" min="0" placeholder="예: 400"></div>
+    </div>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;margin-bottom:14px;">
+      <div class="form-group"><label class="form-label">박스 가로 (mm)</label><input class="form-control" type="number" id="if-box-w" min="0" step="0.1" placeholder="예: 350"></div>
+      <div class="form-group"><label class="form-label">박스 세로 (mm)</label><input class="form-control" type="number" id="if-box-d" min="0" step="0.1" placeholder="예: 250"></div>
+      <div class="form-group"><label class="form-label">박스 높이 (mm)</label><input class="form-control" type="number" id="if-box-h" min="0" step="0.1" placeholder="예: 200"></div>
+      <div class="form-group"><label class="form-label">박스 무게 (KG)</label><input class="form-control" type="number" id="if-box-wt" min="0" step="0.001" placeholder="예: 1.5"></div>
     </div>
     <div class="form-group" style="margin-bottom:14px;"><label class="form-label">비고</label><input class="form-control" type="text" id="if-note" placeholder="메모 (선택)"></div>
     <input type="hidden" id="if-cat" value="기타">
@@ -1561,18 +1568,21 @@ textarea.form-control{min-height:64px;resize:vertical;}
     <div class="form-group" style="margin-bottom:4px;">
       <label class="form-label">월별 환율 등록</label>
       <div id="fx-rate-list" style="max-height:240px;overflow-y:auto;border:1px solid var(--border2);border-radius:var(--r);padding:8px;margin-bottom:8px;"></div>
-      <div style="display:flex;gap:6px;align-items:center;">
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
         <input class="form-control" type="month" id="fx-new-month" style="width:150px;">
-        <input class="form-control" type="number" id="fx-new-rate" placeholder="환율 (예: 1548)" min="0" step="0.01" style="width:160px;">
-        <button class="btn btn-secondary btn-sm" onclick="addFxRate()">추가</button>
+        <input class="form-control" type="number" id="fx-new-rate" placeholder="환율 (예: 1341)" min="0" step="0.01" style="width:150px;">
+        <button class="btn btn-primary btn-sm" onclick="addFxRate()" style="white-space:nowrap;">추가</button>
       </div>
+    </div>
+    <div style="border-top:1px solid var(--border2);margin-top:12px;padding-top:12px;">
+      <label class="form-label" style="font-size:11px;color:var(--text3);">한국수출입은행 API 키 <span style="font-weight:400;">(입고 등록 환율 자동조회에 사용 — <a href="https://www.koreaexim.go.kr/ir/HPHKIR019M01?apino=2" target="_blank" style="color:var(--blue);">무료 발급</a>)</span></label>
+      <input class="form-control" type="text" id="fx-apikey" placeholder="예: 3DhPquFojTHmgpawtAcmESsmHNHdjn9O" style="font-size:12px;font-family:monospace;">
     </div>
     <div style="color:var(--red);font-size:12px;margin-top:8px;min-height:16px;" id="fx-error"></div>
     <div class="modal-actions">
       <button class="btn btn-secondary" onclick="closeFxModal()">취소</button>
       <button class="btn btn-primary" id="fx-save-btn" onclick="saveFxSettings()">✓ 저장</button>
     </div>
-    <input type="hidden" id="fx-apikey">
     <input type="hidden" id="fx-proxy-url">
   </div>
 </div>
@@ -3197,7 +3207,8 @@ function _renderPartnerSection(container, partner, month) {
   const overdueRows = data ? (settleDate ? data.rows.filter(r=>r.deliveryDate>settleDate)  : [])         : [];
   const [y, m] = month.split('-');
   const mNum = parseInt(m);
-  const fxRate = window._fxCache[month] || null;
+  const prevMonth = (()=>{ const d=new Date(parseInt(y),parseInt(m)-1,1); d.setMonth(d.getMonth()-1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; })();
+  const fxRate = window._fxCache[prevMonth] || null;
   const section = document.createElement('div');
   if(rows.length === 0) {
     section.innerHTML = `<div style="padding:14px;color:var(--text3);font-size:13px;">마감월이 지정된 ${mNum}월 [${partner}] 출고 내역이 없습니다. 아래에서 미지정 건의 마감월을 등록해 주세요.</div>`;
@@ -3238,7 +3249,7 @@ function _renderPartnerSection(container, partner, month) {
         <tfoot><tr style="font-weight:700;">
           <td colspan="8" style="${TD}text-align:right;">${mNum}월 마감(${y})&nbsp;&nbsp;${partner}</td>
           <td style="${TD}text-align:right;color:#CC0000;font-size:10pt;">${totalStr}</td>
-          <td style="${TD}text-align:right;color:#CC0000;">${fxRate&&totalUSD>0?`₩${Math.round(totalUSD*fxRate).toLocaleString()}`:''}</td>
+          <td style="${TD}text-align:right;color:#CC0000;">${fxRate&&totalUSD>0?`₩${Math.round(totalUSD*fxRate).toLocaleString()}`:totalUSD>0?`<span style='font-size:10px;'>(${prevMonth} 환율 미등록)</span>`:''}</td>
         </tr></tfoot>
       </table>
       </div>`;
@@ -3404,7 +3415,8 @@ function exportClosingXLSX() {
     const rows = settleDate ? data.rows.filter(r=>r.deliveryDate<=settleDate) : data.rows;
     if(rows.length === 0) continue;
     hasData = true;
-    const fxRate = window._fxCache[month] || null;
+    const prevMonth2 = (()=>{ const [yy,mm]=month.split('-'); const d=new Date(parseInt(yy),parseInt(mm)-1,1); d.setMonth(d.getMonth()-1); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; })();
+    const fxRate = window._fxCache[prevMonth2] || null;
     const totalKRW = rows.filter(r=>r.currency!=='USD').reduce((a,b)=>a+b.amount,0);
     const totalUSD = rows.filter(r=>r.currency==='USD').reduce((a,b)=>a+b.amount,0);
     const totalStr = totalUSD>0&&totalKRW>0?`${totalKRW.toLocaleString()} + ${totalUSD.toLocaleString()}`:totalUSD>0?`${totalUSD.toLocaleString()}`:`${totalKRW.toLocaleString()}`;
@@ -3434,7 +3446,7 @@ function exportClosingXLSX() {
   <tr>
     <td colspan="8" style="${TD}text-align:right;font-weight:700;">${mNum}월 마감(${y})&nbsp;&nbsp;${partner}</td>
     <td style="${TD}text-align:right;font-weight:700;color:#CC0000;font-size:10pt;">${totalStr}</td>
-    <td style="${TD}text-align:right;font-weight:700;color:#CC0000;">${fxRate&&totalUSD>0?`₩${Math.round(totalUSD*fxRate).toLocaleString()}`:''}</td>
+    <td style="${TD}text-align:right;font-weight:700;color:#CC0000;">${fxRate&&totalUSD>0?`₩${Math.round(totalUSD*fxRate).toLocaleString()}`:totalUSD>0?`<span style='font-size:10px;'>(${prevMonth2} 환율 미등록)</span>`:''}</td>
   </tr>
 </table>`;
   }
@@ -3796,7 +3808,7 @@ function clearForm(p) {
   document.getElementById(p+'-date').value=TODAY;
   const amtEl=document.getElementById(p+'-amount'); if(amtEl) amtEl.textContent='—';
   const prEl=document.getElementById(p+'-price'); if(prEl) prEl.value='';
-  if(p==='in'){ const supEl=document.getElementById('in-supplier'); supEl.value=''; supEl._userEdited=false; const n=document.getElementById('in-note2'); if(n)n.value=''; }
+  if(p==='in'){ const supEl=document.getElementById('in-supplier'); supEl.value=''; supEl._userEdited=false; const n=document.getElementById('in-note2'); if(n)n.value=''; ['in-box-w','in-box-d','in-box-h','in-box-wt'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';}); }
   if(p==='out'){
     ['out-dest','out-manager','out-receiver','out-billmonth','out-boxqty','out-orderdate'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
     const boxUnitEl=document.getElementById('out-boxunit'); if(boxUnitEl) boxUnitEl.textContent='—';
@@ -3825,6 +3837,10 @@ async function submitIn() {
   const amount=price*qty;
   const paid='paid';
   const note=(document.getElementById('in-note2')||{}).value||'';
+  const inBoxW=parseFloat(document.getElementById('in-box-w').value)||0;
+  const inBoxD=parseFloat(document.getElementById('in-box-d').value)||0;
+  const inBoxH=parseFloat(document.getElementById('in-box-h').value)||0;
+  const inBoxWt=parseFloat(document.getElementById('in-box-wt').value)||0;
   if(!itemName){showToast('⚠ 품목을 선택하세요.');return;}
   if(!qty||qty<1){showToast('⚠ 수량을 입력하세요.');return;}
   const item=getItem(itemName);
@@ -3834,7 +3850,7 @@ async function submitIn() {
   btn.disabled=true;
   await withSync(async()=>{
     await window._db_updateItem(item.code, { stock: newStock });
-    const histRef = await window._db_addHistoryRef({ date, type:'in', itemName, qty, partner:supplier, supplier, afterStock:newStock, note, price, amount, currency, createdBy:getCurrentUserLabel() });
+    const histRef = await window._db_addHistoryRef({ date, type:'in', itemName, qty, partner:supplier, supplier, afterStock:newStock, note, price, amount, currency, boxW:inBoxW, boxD:inBoxD, boxH:inBoxH, boxWt:inBoxWt, createdBy:getCurrentUserLabel() });
     await window._db_addFinance({ date, type:'매입', itemName, qty, price, amount, partner:supplier, paid, note, historyId: histRef?.id||'', createdBy:getCurrentUserLabel() });
     if(paid==='unpaid' && amount>0) {
       await window._db_addReceivable({ date, type:'미지급', partner:supplier, itemName, amount, status:'미결', dueDate:'' });
@@ -4180,7 +4196,7 @@ function printStatement(data) {
         </tr>`).join('')}
         <!-- 서명/메모행 -->
         <tr>
-          <td colspan="11" class="memo-cell" rowspan="2">${note||''}</td>
+          <td colspan="11" class="memo-cell" rowspan="2" style="white-space:pre-wrap;">${(note||'').replace(/\n/g,'<br>')}</td>
           <td colspan="2" class="label-cell">인수자</td>
           <td colspan="8" class="value-cell bold sign-cell">${receiver||''}</td>
         </tr>
@@ -4312,7 +4328,7 @@ function checkDuplicateCode() {
 function openItemModal() {
   document.getElementById('modal-title').textContent='품목 추가';
   document.getElementById('if-edit-code').value='';
-  ['if-code','if-name','if-unit','if-safe','if-stock','if-note','if-maker','if-buyprice','if-sellprice','if-leadtime','if-boxqty','if-smallboxqty','if-typename','if-buyprice-date','if-sellprice-date'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  ['if-code','if-name','if-unit','if-safe','if-stock','if-note','if-maker','if-buyprice','if-sellprice','if-leadtime','if-boxqty','if-smallboxqty','if-typename','if-buyprice-date','if-sellprice-date','if-box-w','if-box-d','if-box-h','if-box-wt'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   const bCur=document.getElementById('if-buyprice-cur'); if(bCur) bCur.value='KRW';
   const sCur=document.getElementById('if-sellprice-cur'); if(sCur) sCur.value='KRW';
   const msgEl=document.getElementById('if-code-msg'); if(msgEl) msgEl.textContent='';
@@ -4354,6 +4370,10 @@ function editItem(code) {
   document.getElementById('if-maker').value=i.maker||'';
   document.getElementById('if-boxqty').value=i.boxQty||'';
   const sbEl=document.getElementById('if-smallboxqty'); if(sbEl) sbEl.value=i.smallBoxQty||'';
+  const bwEl=document.getElementById('if-box-w'); if(bwEl) bwEl.value=i.boxW||'';
+  const bdEl=document.getElementById('if-box-d'); if(bdEl) bdEl.value=i.boxD||'';
+  const bhEl=document.getElementById('if-box-h'); if(bhEl) bhEl.value=i.boxH||'';
+  const bwtEl=document.getElementById('if-box-wt'); if(bwtEl) bwtEl.value=i.boxWt||'';
   document.getElementById('item-modal').classList.add('open');
 }
 
@@ -4379,7 +4399,11 @@ async function saveItem() {
     leadtime:parseInt(document.getElementById('if-leadtime').value)||0,
     maker:document.getElementById('if-maker').value.trim(),
     boxQty:parseInt(document.getElementById('if-boxqty').value)||0,
-    smallBoxQty:parseInt(document.getElementById('if-smallboxqty').value)||0};
+    smallBoxQty:parseInt(document.getElementById('if-smallboxqty').value)||0,
+    boxW:parseFloat(document.getElementById('if-box-w').value)||0,
+    boxD:parseFloat(document.getElementById('if-box-d').value)||0,
+    boxH:parseFloat(document.getElementById('if-box-h').value)||0,
+    boxWt:parseFloat(document.getElementById('if-box-wt').value)||0};
   obj[editCode ? 'updatedBy' : 'createdBy'] = getCurrentUserLabel();
   if(!editCode && getItems().find(i=>i.code===code)){
     const msgEl=document.getElementById('if-code-msg');
@@ -6530,9 +6554,6 @@ async function importOutFromExcel(input) {
         if(errors.length>0){
           msg+=`\n\n오류 ${errors.length}건:\n`+errors.slice(0,20).join('\n');
           if(errors.length>20) msg+=`\n... 외 ${errors.length-20}건`;
-          if(!forceStock && errors.some(e=>e.includes('재고 부족'))){
-            msg+=`\n\n💡 "재고 무시 등록" 체크 후 다시 시도하세요.`;
-          }
         }
         alert(msg); return;
       }
@@ -7392,6 +7413,62 @@ function addFxRate() {
   document.getElementById('fx-new-month').value = '';
   document.getElementById('fx-new-rate').value = '';
 }
+async function fetchFxRateInline(statusEl) {
+  const now = new Date();
+  const month = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  statusEl.style.color='var(--blue)'; statusEl.textContent='조회 중...';
+
+  // 1순위: 한국수출입은행 공공 API (매매기준율 — 주말/공휴일은 최대 3일 전까지 역순 시도)
+  const eximKey = window._fxApiKey;
+  if(eximKey) {
+    for(let d=0; d<4; d++) {
+      const dt = new Date(now); dt.setDate(dt.getDate()-d);
+      const dateStr = `${dt.getFullYear()}${String(dt.getMonth()+1).padStart(2,'0')}${String(dt.getDate()).padStart(2,'0')}`;
+      const eximUrl = `https://www.koreaexim.go.kr/site/program/financial/exchangeJSON?authkey=${eximKey}&searchdate=${dateStr}&data=AP01`;
+      // 직접 호출 먼저, 실패 시 프록시 경유
+      const urls = [eximUrl];
+      if(window._fxProxyUrl) urls.push(`${window._fxProxyUrl}?url=${encodeURIComponent(eximUrl)}`);
+      let fetched = false;
+      for(const fetchUrl of urls) {
+        try {
+          const res = await fetch(fetchUrl, {signal: AbortSignal.timeout(7000)});
+          if(!res.ok) continue;
+          const arr = await res.json();
+          if(!Array.isArray(arr) || arr.length===0) continue;
+          const usd = arr.find(x=>x.cur_unit==='USD');
+          if(usd && usd.deal_bas_r) {
+            const rate = parseFloat(usd.deal_bas_r.replace(/,/g,''));
+            if(rate>0) {
+              const disp = `${dateStr.slice(0,4)}-${dateStr.slice(4,6)}-${dateStr.slice(6,8)}`;
+              statusEl.style.color='var(--green)';
+              statusEl.textContent = `✓ ${month} USD/KRW: ${rate.toLocaleString()}원 (${disp} 매매기준율)`;
+              if(!window._fxCache) window._fxCache={};
+              window._fxCache[month]=rate;
+              return;
+            }
+          }
+        } catch(e) {}
+      }
+    }
+  }
+  // 수출입은행 API 실패 또는 키 없음 → jsDelivr CDN 대체
+  try {
+    const res = await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json');
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const rate = data.usd && data.usd.krw ? Math.round(data.usd.krw*10)/10 : 0;
+    if(rate>0) {
+      statusEl.style.color='var(--green)';
+      statusEl.textContent = `✓ ${month} USD/KRW: ${rate.toLocaleString()}원 (${data.date||''} 기준)`;
+      if(!window._fxCache) window._fxCache={};
+      window._fxCache[month]=rate;
+      return;
+    }
+  } catch(e) {}
+  statusEl.style.color='var(--red)';
+  statusEl.textContent = '조회 실패 — 환율 설정에서 API 키를 등록하세요.';
+}
+
 async function fetchFxRate() {
   const errEl = document.getElementById('fx-error');
   const month = document.getElementById('fx-new-month').value;
