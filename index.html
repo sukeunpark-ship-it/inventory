@@ -638,9 +638,26 @@ textarea.form-control{min-height:64px;resize:vertical;}
     position:absolute; left:0; top:100%; z-index:9999;
     background:var(--surface); border:1px solid var(--border2);
     border-radius:6px; box-shadow:0 4px 16px rgba(0,0,0,0.18);
-    max-height:260px; overflow-y:auto; width:100%; min-width:320px; display:none;
+    max-height:360px; overflow:hidden; width:100%; min-width:320px; display:none;
+    flex-direction:column;
   }
-  .inout-combo-dropdown.open { display:block; }
+  .inout-combo-dropdown.open { display:flex; }
+  .inout-combo-list { flex:1 1 auto; min-height:0; overflow-y:auto; }
+  .inout-combo-grip {
+    flex:0 0 auto; height:12px; position:relative; cursor:ns-resize;
+    background:var(--surface2); border-top:1px solid var(--border);
+    touch-action:none; user-select:none;
+  }
+  .inout-combo-grip::before {
+    content:''; position:absolute; left:50%; top:4px; width:36px; height:4px; margin-left:-18px;
+    border-top:1px solid var(--text3); border-bottom:1px solid var(--text3); opacity:.6;
+  }
+  .inout-combo-grip-corner {
+    position:absolute; right:0; bottom:0; width:16px; height:12px; cursor:nwse-resize;
+    background:linear-gradient(135deg, transparent 50%, var(--text3) 50%, var(--text3) 58%, transparent 58%, transparent 70%, var(--text3) 70%, var(--text3) 78%, transparent 78%);
+    opacity:.7;
+  }
+  .inout-combo-grip:hover { background:var(--border); }
   .inout-combo-option {
     padding:5px 10px; font-size:12px; cursor:pointer;
     display:grid; grid-template-columns:120px 16px 1fr auto;
@@ -8893,10 +8910,11 @@ function inoutComboFilter(prefix, q) {
   const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   const hl  = (txt, q) => q ? txt.replace(new RegExp(esc(q),'gi'), m=>`<mark>${m}</mark>`) : txt;
   const filtered = lq ? items.filter(i => i.code.toLowerCase().includes(lq) || i.name.toLowerCase().includes(lq)) : items;
+  let listHtml;
   if(filtered.length === 0) {
-    dropdown.innerHTML = '<div style="padding:8px 12px;color:var(--text3);font-size:12px;">검색 결과 없음</div>';
+    listHtml = '<div style="padding:8px 12px;color:var(--text3);font-size:12px;">검색 결과 없음</div>';
   } else {
-    dropdown.innerHTML = filtered.map(i => {
+    listHtml = filtered.map(i => {
       const safeName = i.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
       return `<div class="inout-combo-option" onclick="inoutComboSelect('${prefix}','${safeName}')">` +
         `<span class="ico-code">${hl(i.code,lq)}</span>` +
@@ -8906,7 +8924,58 @@ function inoutComboFilter(prefix, q) {
         `</div>`;
     }).join('');
   }
+  dropdown.innerHTML =
+    `<div class="inout-combo-list">${listHtml}</div>` +
+    `<div class="inout-combo-grip" title="드래그해서 목록 크기 조절" onmousedown="event.preventDefault()" onpointerdown="inoutComboResizeStart(event,'${prefix}','v')">` +
+      `<div class="inout-combo-grip-corner" onpointerdown="event.stopPropagation();inoutComboResizeStart(event,'${prefix}','both')"></div>` +
+    `</div>`;
+  inoutComboApplySize(dropdown);
   dropdown.classList.add('open');
+}
+
+/* 목록 크기 조절 (아래 손잡이 드래그: 높이 / 오른쪽 아래 모서리: 높이+너비) — 크기는 기억됨 */
+function inoutComboGetSize() {
+  try { return JSON.parse(localStorage.getItem('inoutComboSize')||'null') || {}; } catch(e) { return {}; }
+}
+function inoutComboApplySize(dd) {
+  const s = inoutComboGetSize();
+  if(s.h) dd.style.maxHeight = s.h + 'px';
+  if(s.w) dd.style.width = s.w + 'px';
+}
+function inoutComboResizeStart(evt, prefix, mode) {
+  evt.preventDefault();               // 검색창 포커스 유지 (드롭다운이 닫히지 않도록)
+  const dd = document.getElementById(prefix+'-item-dropdown');
+  if(!dd) return;
+  const grip = evt.currentTarget;
+  try { grip.setPointerCapture(evt.pointerId); } catch(e) {}
+  const startY = evt.clientY, startX = evt.clientX;
+  const rect = dd.getBoundingClientRect();
+  const startH = rect.height, startW = rect.width;
+  const maxH = Math.max(200, window.innerHeight - rect.top - 8);
+  const maxW = Math.max(320, window.innerWidth - rect.left - 16);
+  dd.style.maxHeight = startH + 'px';
+  const move = e => {
+    const h = Math.min(maxH, Math.max(120, startH + (e.clientY - startY)));
+    dd.style.maxHeight = h + 'px';
+    if(mode === 'both') {
+      const w = Math.min(maxW, Math.max(320, startW + (e.clientX - startX)));
+      dd.style.width = w + 'px';
+    }
+  };
+  const up = () => {
+    grip.removeEventListener('pointermove', move);
+    grip.removeEventListener('pointerup', up);
+    grip.removeEventListener('pointercancel', up);
+    const s = inoutComboGetSize();
+    s.h = Math.round(parseFloat(dd.style.maxHeight));
+    if(mode === 'both') s.w = Math.round(parseFloat(dd.style.width));
+    try { localStorage.setItem('inoutComboSize', JSON.stringify(s)); } catch(e) {}
+    const inp = document.getElementById(prefix+'-item-search');
+    if(inp && document.activeElement !== inp) inp.focus();
+  };
+  grip.addEventListener('pointermove', move);
+  grip.addEventListener('pointerup', up);
+  grip.addEventListener('pointercancel', up);
 }
 function inoutComboSelect(prefix, name) {
   const sel = document.getElementById(prefix+'-item');
