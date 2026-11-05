@@ -623,6 +623,26 @@ textarea.form-control{min-height:64px;resize:vertical;}
 /* Loading skeleton */
 .skeleton{background:linear-gradient(90deg,var(--surface2) 25%,#e8e7e0 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:4px;height:14px;}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  /* 단가표 */
+  .pt-seg { display:inline-flex; border:1px solid var(--border2); border-radius:var(--r); overflow:hidden; }
+  .pt-seg button { border:none; background:var(--surface); color:var(--text2); padding:5px 12px; font-size:12px; cursor:pointer; font-family:'Noto Sans KR',sans-serif; }
+  .pt-seg button + button { border-left:1px solid var(--border2); }
+  .pt-seg button.on { background:var(--blue); color:#fff; font-weight:600; }
+  .pt-wrap { overflow:auto; max-height:70vh; border-top:1px solid var(--border); }
+  .pt-table { width:100%; border-collapse:collapse; font-size:12px; }
+  .pt-table th { position:sticky; top:0; z-index:2; background:var(--surface2); color:var(--text2); font-weight:600; text-align:left; padding:8px 10px; border-bottom:1px solid var(--border2); white-space:nowrap; }
+  .pt-table th.num, .pt-table td.num { text-align:right; }
+  .pt-table td { padding:7px 10px; border-bottom:1px solid var(--border); white-space:nowrap; color:var(--text); }
+  .pt-table tbody tr:hover td { background:var(--blue-bg); }
+  .pt-table td.mono { font-family:monospace; color:var(--text2); }
+  .pt-table td.empty-p { color:var(--text3); text-align:center; }
+  .pt-table th .pt-type { display:block; font-size:10px; font-weight:500; }
+  .pt-table th .pt-type.sell { color:var(--green); }
+  .pt-table th .pt-type.buy { color:var(--red); }
+  .pt-table th.pt-partner { text-align:right; border-left:1px solid var(--border); }
+  .pt-table td.pt-partner { border-left:1px solid var(--border); }
+  .pt-table tr.pt-group td { background:var(--surface2); font-weight:700; cursor:pointer; color:var(--text); }
+  .pt-table tr.pt-group:hover td { background:var(--border); }
   .inout-combo-wrap { position:relative; width:100%; }
   .inout-combo-wrap > .form-control { width:100%; box-sizing:border-box; }
   .inout-row1 { display:grid; grid-template-columns:3fr 1fr 1.5fr 1.5fr; gap:14px; margin-bottom:14px; }
@@ -1061,6 +1081,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:12px;">
           <div style="display:flex;align-items:center;gap:8px;flex:1;">
             <button class="btn btn-secondary" onclick="renderSafetyStockAnalysis()">🔬 안전재고 자동 분석</button>
+            <button class="btn btn-secondary" id="pt-toggle-btn" onclick="togglePriceTable()">💰 단가표</button>
             <input class="form-control" type="text" id="items-search" placeholder="품목코드, 품목명, MAKER 검색..." oninput="renderItemsTab()" style="max-width:280px;">
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
@@ -1095,6 +1116,26 @@ textarea.form-control{min-height:64px;resize:vertical;}
             과거 출고 데이터를 분석해 <strong>3가지 공식</strong>으로 권장 안전재고를 계산합니다. 리드타임(발주~입고 소요일)을 설정하면 더 정확합니다.
           </div>
           <div id="safety-analysis-body"></div>
+        </div>
+        <!-- 단가표 패널 (토글) -->
+        <div class="card" id="price-table-card" style="display:none;border-color:var(--blue-mid);margin-bottom:16px;">
+          <div class="card-header" style="flex-wrap:wrap;gap:8px;">
+            <div class="card-title" style="color:var(--blue)">💰 단가표 <span id="pt-count" style="font-size:11px;color:var(--text3);font-weight:400;margin-left:6px;"></span></div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+              <span style="font-size:12px;color:var(--text2);">묶어보기</span>
+              <div class="pt-seg">
+                <button type="button" data-g="typeName" onclick="setPriceTableGroup('typeName')">품명별</button>
+                <button type="button" data-g="maker" onclick="setPriceTableGroup('maker')">Maker별</button>
+                <button type="button" data-g="none" onclick="setPriceTableGroup('none')">전체</button>
+              </div>
+              <button class="btn btn-secondary btn-sm" onclick="exportPriceTableExcel()">⬇ 엑셀</button>
+              <button class="btn btn-secondary btn-sm" onclick="togglePriceTable(false)">닫기</button>
+            </div>
+          </div>
+          <div class="card-body" style="font-size:11px;color:var(--text3);padding-top:8px;padding-bottom:8px;">
+            업체별 가격은 오늘 기준 적용 단가입니다 · 위 검색창(품목코드·품목명·MAKER)으로 걸러집니다 · 묶음 제목을 누르면 접고 펼 수 있습니다
+          </div>
+          <div id="price-table-body" class="pt-wrap"></div>
         </div>
         <div class="card card-table"><table><thead><tr>
           <th class="th-sort" onclick="toggleSort('items','code',renderItemsTab)">코드<span class="sort-arrow" id="sort-items-code"></span></th>
@@ -2831,6 +2872,121 @@ function renderItemsTab() {
         <button class="btn btn-danger btn-sm" onclick="deleteItem('${i.code}')">삭제</button>
       </div></td>
     </tr>`).join('');
+  // 단가표가 열려 있으면 같이 갱신 (검색어·실시간 변경 반영)
+  const ptCard = document.getElementById('price-table-card');
+  if(ptCard && ptCard.style.display === 'block') renderPriceTable();
+}
+
+/* ── 단가표 (품명·Maker P/no·입고가·LG인정가·업체별 가격) ── */
+window._ptGroup = 'typeName';
+window._ptCollapsed = new Set();
+function togglePriceTable(force) {
+  const card = document.getElementById('price-table-card');
+  if(!card) return;
+  const show = (typeof force === 'boolean') ? force : card.style.display !== 'block';
+  card.style.display = show ? 'block' : 'none';
+  const btn = document.getElementById('pt-toggle-btn');
+  if(btn) btn.classList.toggle('btn-primary', show), btn.classList.toggle('btn-secondary', !show);
+  if(show) { renderPriceTable(); card.scrollIntoView({behavior:'smooth', block:'nearest'}); }
+}
+function setPriceTableGroup(g) {
+  window._ptGroup = g;
+  window._ptCollapsed = new Set();
+  renderPriceTable();
+}
+function togglePriceTableGroup(key) {
+  const s = window._ptCollapsed;
+  s.has(key) ? s.delete(key) : s.add(key);
+  renderPriceTable();
+}
+function _ptEsc(s) {
+  return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+/* 표에 들어갈 데이터 계산 (화면·엑셀 공용) */
+function _ptBuildData() {
+  const q = (document.getElementById('items-search')||{}).value?.toLowerCase().trim()||'';
+  let items = getItems().slice();
+  if(q) items = items.filter(i =>
+    (i.code||'').toLowerCase().includes(q) ||
+    (i.name||'').toLowerCase().includes(q) ||
+    (i.maker||'').toLowerCase().includes(q) ||
+    (i.typeName||'').toLowerCase().includes(q)
+  );
+  // 업체별 가격 열: 표시되는 품목에 단가가 등록된 (거래처, 매출/매입) 조합
+  const names = new Set(items.map(i=>i.name));
+  const colMap = new Map();
+  getPrices().forEach(p => {
+    if(!p.partner || !names.has(p.itemName)) return;
+    const k = p.partner + '\u0000' + (p.type||'');
+    if(!colMap.has(k)) colMap.set(k, {partner:p.partner, type:p.type||''});
+  });
+  const typeOrder = t => t==='매출'?0:t==='매입'?1:2;
+  const cols = [...colMap.values()].sort((a,b)=> typeOrder(a.type)-typeOrder(b.type) || a.partner.localeCompare(b.partner,'ko'));
+  // 그룹 정렬
+  const g = window._ptGroup;
+  const keyOf = i => g==='typeName' ? (i.typeName||'(품명 미입력)') : g==='maker' ? (i.maker||'(Maker 미입력)') : '';
+  items.sort((a,b)=> keyOf(a).localeCompare(keyOf(b),'ko') || (a.name||'').localeCompare(b.name||'','ko'));
+  const rows = items.map(i => ({
+    item: i,
+    group: keyOf(i),
+    partnerPrices: cols.map(c => getPartnerPrice(i.name, c.partner, c.type) || null)
+  }));
+  return { rows, cols, group:g };
+}
+function renderPriceTable() {
+  const body = document.getElementById('price-table-body');
+  if(!body) return;
+  document.querySelectorAll('#price-table-card .pt-seg button').forEach(b=>b.classList.toggle('on', b.dataset.g===window._ptGroup));
+  const { rows, cols, group } = _ptBuildData();
+  const cnt = document.getElementById('pt-count');
+  if(cnt) cnt.textContent = `품목 ${rows.length}개 · 업체 단가 ${cols.length}열`;
+  if(rows.length === 0) { body.innerHTML = '<div class="empty" style="padding:20px;">표시할 품목이 없습니다.</div>'; return; }
+  const ncol = 6 + cols.length;
+  const head = `<tr>
+      <th>품명</th><th>Maker</th><th>Maker P/no</th><th>코드</th>
+      <th class="num">입고가</th><th class="num">LG인정가</th>
+      ${cols.map(c=>`<th class="pt-partner">${_ptEsc(c.partner)}<span class="pt-type ${c.type==='매출'?'sell':c.type==='매입'?'buy':''}">${_ptEsc(c.type||'')}</span></th>`).join('')}
+    </tr>`;
+  let html = '', lastGroup = null;
+  rows.forEach(r => {
+    if(group !== 'none' && r.group !== lastGroup) {
+      lastGroup = r.group;
+      const n = rows.filter(x=>x.group===r.group).length;
+      const closed = window._ptCollapsed.has(r.group);
+      html += `<tr class="pt-group" onclick="togglePriceTableGroup(this.dataset.k)" data-k="${_ptEsc(r.group)}"><td colspan="${ncol}">${closed?'▶':'▼'} ${_ptEsc(r.group)} <span style="font-weight:400;color:var(--text3);">(${n}개)</span></td></tr>`;
+    }
+    if(group !== 'none' && window._ptCollapsed.has(r.group)) return;
+    const i = r.item;
+    html += `<tr>
+      <td>${_ptEsc(i.typeName||'—')}</td>
+      <td>${_ptEsc(i.maker||'—')}</td>
+      <td style="font-weight:600">${_ptEsc(i.name)}</td>
+      <td class="mono">${_ptEsc(i.code)}</td>
+      <td class="num mono">${i.buyPrice ? fmtItemPrice(i.buyPrice, i.buyCurrency) : '—'}</td>
+      <td class="num mono">${i.sellPrice ? fmtItemPrice(i.sellPrice, i.sellCurrency) : '—'}</td>
+      ${r.partnerPrices.map(p => p && p.price
+        ? `<td class="num mono pt-partner" title="적용일 ${_ptEsc(p.applyDate||'—')}">${fmtItemPrice(p.price, p.currency)}</td>`
+        : `<td class="empty-p pt-partner">—</td>`).join('')}
+    </tr>`;
+  });
+  body.innerHTML = `<table class="pt-table"><thead>${head}</thead><tbody>${html}</tbody></table>`;
+}
+function exportPriceTableExcel() {
+  if(typeof XLSX === 'undefined') { showToast('⚠ 엑셀 라이브러리를 불러오지 못했습니다.'); return; }
+  const { rows, cols } = _ptBuildData();
+  const header = ['품명','Maker','Maker P/no','코드','입고가','입고가 통화','LG인정가','LG인정가 통화',
+    ...cols.flatMap(c=>[`${c.partner} (${c.type})`, `${c.partner} (${c.type}) 통화`])];
+  const aoa = [header, ...rows.map(r => {
+    const i = r.item;
+    return [i.typeName||'', i.maker||'', i.name||'', i.code||'',
+      i.buyPrice||'', i.buyPrice?(i.buyCurrency||'KRW'):'', i.sellPrice||'', i.sellPrice?(i.sellCurrency||'KRW'):'',
+      ...r.partnerPrices.flatMap(p => p && p.price ? [p.price, p.currency||'KRW'] : ['',''])];
+  })];
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols'] = header.map((h,idx)=>({wch: idx<4 ? 18 : 12}));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, '단가표');
+  XLSX.writeFile(wb, `단가표_${TODAY.replace(/-/g,'')}.xlsx`);
 }
 
 /* ── 안전재고 자동 분석 ── */
