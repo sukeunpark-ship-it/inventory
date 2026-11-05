@@ -281,6 +281,13 @@
       window._customers = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
       if(window._onDataUpdate) window._onDataUpdate('customers');
     });
+
+    // Invoice / PL
+    const ivq = query(collection(db, "invoices"), orderBy("createdAt", "desc"));
+    onSnapshot(ivq, snap => {
+      window._invoices = snap.docs.map(d => ({ _id: d.id, ...d.data() }));
+      if(window._onDataUpdate) window._onDataUpdate('invoices');
+    });
   }
 
   /* ── CRUD helpers ── */
@@ -386,6 +393,15 @@
   };
   window._db_deleteFileMeta = async (id) => {
     await deleteDoc(doc(db, "files", id));
+  };
+  window._db_addInvoice = async (obj) => {
+    return await addDoc(collection(db, "invoices"), { ...obj, createdAt: serverTimestamp() });
+  };
+  window._db_updateInvoice = async (id, obj) => {
+    await setDoc(doc(db, "invoices", id), { ...obj, updatedAt: serverTimestamp() }, { merge: true });
+  };
+  window._db_deleteInvoice = async (id) => {
+    await deleteDoc(doc(db, "invoices", id));
   };
   window._db_addCustomer = async (obj) => {
     await addDoc(collection(db, "customers"), { ...obj, createdAt: serverTimestamp() });
@@ -607,6 +623,39 @@ textarea.form-control{min-height:64px;resize:vertical;}
 /* Loading skeleton */
 .skeleton{background:linear-gradient(90deg,var(--surface2) 25%,#e8e7e0 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:4px;height:14px;}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  .inout-combo-wrap { position:relative; width:100%; }
+  .inout-combo-wrap > .form-control { width:100%; box-sizing:border-box; }
+  .inout-row1 { display:grid; grid-template-columns:3fr 1fr 1.5fr 1.5fr; gap:14px; margin-bottom:14px; }
+  .inout-row2 { display:grid; grid-template-columns:2fr 1.5fr 3fr; gap:14px; margin-bottom:14px; }
+  .inout-row4 { display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:14px; margin-bottom:14px; }
+  .inout-row5 { display:grid; grid-template-columns:1fr 1fr 2fr 1fr 1.2fr; gap:14px; margin-bottom:14px; }
+  .inout-row-note { display:grid; grid-template-columns:1fr 3fr; gap:14px; margin-bottom:14px; }
+  @media (max-width:1000px) {
+    .inout-row1, .inout-row2, .inout-row4, .inout-row5, .inout-row-note { grid-template-columns:1fr 1fr; }
+    .inout-row1 > :first-child, .inout-row5 > :nth-child(3) { grid-column:span 2; }
+  }
+  .inout-combo-dropdown {
+    position:absolute; left:0; top:100%; z-index:9999;
+    background:var(--surface); border:1px solid var(--border2);
+    border-radius:6px; box-shadow:0 4px 16px rgba(0,0,0,0.18);
+    max-height:260px; overflow-y:auto; width:100%; min-width:320px; display:none;
+  }
+  .inout-combo-dropdown.open { display:block; }
+  .inout-combo-option {
+    padding:5px 10px; font-size:12px; cursor:pointer;
+    display:grid; grid-template-columns:120px 16px 1fr auto;
+    align-items:center; gap:0;
+    border-bottom:1px solid var(--border); color:var(--text);
+    white-space:nowrap; overflow:hidden;
+  }
+  .inout-combo-option:last-child { border-bottom:none; }
+  .inout-combo-option:hover, .inout-combo-option.active { background:#1a73e8; color:#fff !important; }
+  .inout-combo-option:hover *, .inout-combo-option.active * { color:#fff !important; }
+  .inout-combo-option mark { background:transparent; color:inherit; font-weight:700; }
+  .ico-code { font-family:monospace; overflow:hidden; text-overflow:ellipsis; color:var(--text2); }
+  .ico-sep  { text-align:center; color:var(--text3); }
+  .ico-name { overflow:hidden; text-overflow:ellipsis; padding-right:8px; }
+  .ico-stock{ color:var(--text3); font-size:11px; white-space:nowrap; }
 </style>
 </head>
 <body>
@@ -712,6 +761,8 @@ textarea.form-control{min-height:64px;resize:vertical;}
       <div class="nav-item" onclick="showTab('stockalert')" id="nav-stockalert" style="display:none"><span class="icon">🔔</span> 재고 부족 알림 <span id="alert-badge" class="nav-badge" style="display:none">0</span></div>
       <div class="nav-section">파일 보관함</div>
       <div class="nav-item" onclick="showTab('filevault')" id="nav-filevault"><span class="icon">📁</span> 파일 보관함</div>
+      <div class="nav-section">수출 서류</div>
+      <div class="nav-item" onclick="showTab('invoice')" id="nav-invoice"><span class="icon">📄</span> Invoice / PL 생성</div>
     </nav>
     <div class="sidebar-footer">
       <div class="sync-status">
@@ -796,29 +847,26 @@ textarea.form-control{min-height:64px;resize:vertical;}
             </div>
           </div>
           <div class="card-body">
-            <div class="form-grid">
-              <div class="form-group"><label class="form-label">품목 선택 * <button type="button" onclick="openScanner('in')" style="margin-left:6px;border:1px solid var(--border2);background:var(--surface2);border-radius:6px;padding:1px 8px;font-size:11px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">📷 스캔</button></label><select class="form-control" id="in-item"></select></div>
-              <div class="form-group"><label class="form-label">입고 수량 *</label><input class="form-control" type="number" id="in-qty" min="1" placeholder="수량"></div>
-            </div>
-            <div class="form-grid">
+            <!-- 1행: 품목(넓게) | 수량 | 입고일자 | 공급업체 -->
+            <div class="inout-row1">
+              <div class="form-group"><label class="form-label">품목 선택 * <button type="button" onclick="openScanner('in')" style="margin-left:6px;border:1px solid var(--border2);background:var(--surface2);border-radius:6px;padding:1px 8px;font-size:11px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">📷 스캔</button></label><div class="inout-combo-wrap"><input type="text" class="form-control" id="in-item-search" placeholder="코드 또는 품목명 검색..." autocomplete="off" oninput="inoutComboFilter('in',this.value)" onfocus="inoutComboOpen('in')" onkeydown="inoutComboKey(event,'in')" onblur="setTimeout(()=>{const d=document.getElementById('in-item-dropdown');if(d)d.classList.remove('open');},150)"><div class="inout-combo-dropdown" id="in-item-dropdown"></div></div><select id="in-item" style="display:none"></select></div>
+              <div class="form-group"><label class="form-label">입고 수량 *</label><input class="form-control" type="number" id="in-qty" placeholder="수량"></div>
               <div class="form-group"><label class="form-label">입고일자 *</label><input class="form-control" type="date" id="in-date"></div>
               <div class="form-group"><label class="form-label">공급업체</label><input class="form-control" type="text" id="in-supplier" placeholder="공급업체명"></div>
             </div>
-            <div class="form-grid">
+            <!-- 2행: 입고단가 | 입고금액 | 비고 -->
+            <div class="inout-row2">
               <div class="form-group"><label class="form-label">입고 단가 <span id="in-currency-label" style="color:var(--text3);font-weight:400;">(₩)</span></label>
-                <div style="display:flex;align-items:center;gap:0;">
-                  <span id="in-currency-symbol" style="padding:9px 8px;background:var(--surface2);border:1px solid var(--border2);border-right:none;border-radius:var(--r) 0 0 var(--r);font-size:13px;color:var(--text2);min-width:24px;text-align:center;">₩</span>
-                  <input class="form-control" type="number" id="in-price" min="0" step="0.01" placeholder="품목 기본단가 자동 적용" oninput="calcAmount('in')" style="border-radius:0 var(--r) var(--r) 0;">
+                <div style="display:flex;align-items:stretch;gap:0;width:100%;">
+                  <span id="in-currency-symbol" style="padding:9px 8px;background:var(--surface2);border:1px solid var(--border2);border-right:none;border-radius:var(--r) 0 0 var(--r);font-size:13px;color:var(--text2);min-width:24px;text-align:center;flex-shrink:0;">₩</span>
+                  <input class="form-control" type="number" id="in-price" min="0" step="0.01" placeholder="품목 기본단가 자동 적용" oninput="calcAmount('in')" style="border-radius:0 var(--r) var(--r) 0;flex:1;min-width:0;">
                 </div>
                 <div id="in-price-hint" style="font-size:10px;color:var(--blue);margin-top:3px;min-height:14px;"></div>
               </div>
               <div class="form-group"><label class="form-label">입고 금액</label><div class="form-control" id="in-amount" style="background:var(--surface2);color:var(--green);font-weight:600;">—</div></div>
-              <input type="hidden" id="in-currency" value="KRW">
-            </div>
-
-            <div class="form-grid">
               <div class="form-group"><label class="form-label">비고</label><textarea class="form-control" id="in-note2" placeholder="메모 (선택)" rows="3" style="resize:vertical;min-height:62px;"></textarea></div>
             </div>
+            <input type="hidden" id="in-currency" value="KRW">
             <div class="form-actions">
               <button class="btn btn-secondary" onclick="clearForm('in')">초기화</button>
               <button class="btn btn-primary" id="btn-submit-in" onclick="submitIn()">✓ 입고 등록</button>
@@ -843,13 +891,13 @@ textarea.form-control{min-height:64px;resize:vertical;}
             </div>
           </div>
           <div class="card-body">
-            <div class="form-grid" style="grid-template-columns:2fr 1fr 1fr 1fr;">
-              <div class="form-group"><label class="form-label">품목 선택 * <button type="button" onclick="openScanner('out')" style="margin-left:6px;border:1px solid var(--border2);background:var(--surface2);border-radius:6px;padding:1px 8px;font-size:11px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">📷 스캔</button></label><select class="form-control" id="out-item"></select></div>
-              <div class="form-group"><label class="form-label">출고 수량 *</label><input class="form-control" type="number" id="out-qty" min="1" placeholder="수량"></div>
+            <div class="inout-row1">
+              <div class="form-group"><label class="form-label">품목 선택 * <button type="button" onclick="openScanner('out')" style="margin-left:6px;border:1px solid var(--border2);background:var(--surface2);border-radius:6px;padding:1px 8px;font-size:11px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">📷 스캔</button></label><div class="inout-combo-wrap"><input type="text" class="form-control" id="out-item-search" placeholder="코드 또는 품목명 검색..." autocomplete="off" oninput="inoutComboFilter('out',this.value)" onfocus="inoutComboOpen('out')" onkeydown="inoutComboKey(event,'out')" onblur="setTimeout(()=>{const d=document.getElementById('out-item-dropdown');if(d)d.classList.remove('open');},150)"><div class="inout-combo-dropdown" id="out-item-dropdown"></div></div><select id="out-item" style="display:none"></select></div>
+              <div class="form-group"><label class="form-label">출고 수량 *</label><input class="form-control" type="number" id="out-qty" placeholder="수량"></div>
               <div class="form-group"><label class="form-label">박스수량 <span style="font-size:10px;color:var(--text3);font-weight:400;">박스×장입=수량</span></label><input class="form-control" type="number" id="out-boxqty" min="0" placeholder="박스 수"></div>
               <div class="form-group"><label class="form-label">장입수량 <span style="font-size:9px;color:var(--text3);font-weight:400;">품목관리 등록값</span></label><div class="form-control" id="out-boxunit" style="background:var(--surface2);color:var(--text3);">—</div></div>
             </div>
-            <div class="form-grid form-grid-3">
+            <div class="inout-row5">
               <div class="form-group"><label class="form-label">출고일자 *</label><input class="form-control" type="date" id="out-date"></div>
               <div class="form-group"><label class="form-label">발주일자 <span style="font-size:10px;color:var(--text3);font-weight:400;">마감내역서 표시용</span></label><input class="form-control" type="date" id="out-orderdate"></div>
               <div class="form-group"><label class="form-label">출고처</label>
@@ -858,13 +906,11 @@ textarea.form-control{min-height:64px;resize:vertical;}
                   <div id="out-dest-dropdown" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r);box-shadow:0 4px 12px rgba(0,0,0,.12);z-index:300;max-height:200px;overflow-y:auto;"></div>
                 </div>
               </div>
+              <div class="form-group"><label class="form-label">Maker</label><div class="form-control" id="out-maker" style="background:var(--surface2);color:var(--text3);">—</div></div>
+              <div class="form-group"><label class="form-label" title="거래명세서에 표시용 · 비워두면 출고일자 기준 자동 계산">적용마감월 <span style="font-size:10px;color:var(--text3);font-weight:400;">비우면 자동</span></label><input class="form-control" type="month" id="out-billmonth"></div>
             </div>
             <div id="out-last-hint" style="display:none;border-radius:var(--r);padding:8px 12px;font-size:12px;line-height:1.6;margin-bottom:10px;"></div>
-            <div class="form-grid">
-              <div class="form-group"><label class="form-label">Maker</label><div class="form-control" id="out-maker" style="background:var(--surface2);color:var(--text3);">—</div></div>
-              <div class="form-group"><label class="form-label">적용마감월 <span style="font-size:10px;color:var(--text3);font-weight:400;">거래명세서에 표시용 · 비워두면 출고일자 기준 자동 계산</span></label><input class="form-control" type="month" id="out-billmonth"></div>
-            </div>
-            <div class="form-grid">
+            <div class="inout-row4">
               <div class="form-group"><label class="form-label">출고 단가</label>
                 <div style="display:flex;align-items:center;gap:0;width:100%;">
                   <span id="out-currency-symbol" style="padding:9px 8px;background:var(--surface2);border:1px solid var(--border2);border-right:none;border-radius:var(--r) 0 0 var(--r);font-size:13px;color:var(--text2);min-width:28px;text-align:center;flex-shrink:0;">₩</span>
@@ -873,14 +919,12 @@ textarea.form-control{min-height:64px;resize:vertical;}
                 <div id="out-price-hint" style="font-size:13px;color:#e53e3e;margin-top:3px;min-height:14px;font-weight:600;"></div>
               </div>
               <div class="form-group"><label class="form-label">출고 금액 (매출)</label><div class="form-control" id="out-amount" style="background:var(--surface2);color:var(--red);font-weight:600;font-size:15px;">—</div></div>
-            </div>
-            <input type="hidden" id="out-currency-label">
-            <input type="hidden" id="out-currency" value="KRW">
-            <div class="form-grid">
               <div class="form-group"><label class="form-label">공급자 (우리 회사명)</label><input class="form-control" type="text" id="out-seller" placeholder="예: (주)우리회사" readonly style="background:var(--surface2);color:var(--text2);"></div>
               <div class="form-group"><label class="form-label">담당자명</label><input class="form-control" type="text" id="out-manager" placeholder="담당자 이름"></div>
             </div>
-            <div class="form-grid">
+            <input type="hidden" id="out-currency-label">
+            <input type="hidden" id="out-currency" value="KRW">
+            <div class="inout-row-note">
               <div class="form-group"><label class="form-label">인수자 <span style="font-size:10px;color:var(--text3);font-weight:400;">(명세서에 표시)</span></label><input class="form-control" type="text" id="out-receiver" placeholder="인수자 이름"></div>
               <div class="form-group"><label class="form-label">비고</label><textarea class="form-control" id="out-note2" placeholder="메모 (선택)" rows="3" style="resize:vertical;min-height:62px;"></textarea></div>
             </div>
@@ -1428,6 +1472,132 @@ textarea.form-control{min-height:64px;resize:vertical;}
       </div>
 
 
+      <!-- Invoice / PL 생성 탭 -->
+      <div class="tab-content" id="tab-invoice">
+        <!-- 저장된 Invoice 목록 -->
+        <div class="card" style="margin-bottom:16px;padding:20px;" id="iv-saved-section">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;border-bottom:1px solid var(--border2);padding-bottom:10px;">
+            <div style="font-weight:700;font-size:14px;color:var(--text1);">💾 저장된 Invoice 목록</div>
+            <button class="btn btn-secondary" style="font-size:12px;padding:5px 14px;" onclick="startNewInvoice()">＋ 새 Invoice 작성</button>
+          </div>
+          <div id="iv-saved-list"><div style="color:var(--text3);font-size:13px;padding:10px 0;">저장된 Invoice가 없습니다.</div></div>
+        </div>
+
+        <!-- 입력 폼 (새 작성 / 수정 시 표시) -->
+        <div id="iv-form-section" style="display:none;">
+        <!-- 기본 정보 -->
+        <div class="card" style="margin-bottom:16px;padding:20px;">
+          <div style="font-weight:700;font-size:14px;margin-bottom:16px;color:var(--text1);border-bottom:1px solid var(--border2);padding-bottom:10px;">📋 선적 서류 기본 정보 <span id="iv-editing-label" style="font-size:11px;font-weight:400;color:var(--blue);margin-left:8px;"></span></div>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;margin-bottom:14px;">
+            <div class="form-group">
+              <label class="form-label">Invoice No.</label>
+              <input class="form-control" type="text" id="iv-no" placeholder="예: USE-MSE-2503B">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Invoice 날짜</label>
+              <input class="form-control" type="date" id="iv-date">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Shipper 담당자</label>
+              <input class="form-control" type="text" id="iv-shipper-attn" placeholder="예: Kuy Hwan, Park / +82-10-8287-3083">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Consignee (수신처)</label>
+              <select class="form-control" id="iv-consignee" onchange="onConsigneeChange()">
+                <option value="">-- 거래처 선택 --</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-grid" style="grid-template-columns:2fr 1fr;gap:14px;margin-bottom:14px;">
+            <div class="form-group">
+              <label class="form-label">Consignee 주소</label>
+              <input class="form-control" type="text" id="iv-consignee-addr" placeholder="주소 (거래처 선택 시 자동입력)">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Consignee 담당자</label>
+              <input class="form-control" type="text" id="iv-consignee-attn" placeholder="예: Mr. KICHAN, CHO / +66-99-229-2558">
+            </div>
+          </div>
+          <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;">
+            <div class="form-group">
+              <label class="form-label">Port of Loading</label>
+              <input class="form-control" type="text" id="iv-pol" value="Busan, Korea">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Final Destination</label>
+              <input class="form-control" type="text" id="iv-pod" placeholder="예: Laem Chabang, Thailand">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Carrier</label>
+              <input class="form-control" type="text" id="iv-carrier" value="By Vessel">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Sailing on/or about</label>
+              <input class="form-control" type="text" id="iv-sailing" placeholder="예: Mar. 2025">
+            </div>
+          </div>
+        </div>
+
+        <!-- 품목 테이블 -->
+        <div class="card" style="margin-bottom:16px;padding:20px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;border-bottom:1px solid var(--border2);padding-bottom:10px;">
+            <div style="font-weight:700;font-size:14px;color:var(--text1);">📦 품목 목록</div>
+            <button class="btn btn-secondary" style="font-size:12px;padding:5px 14px;" onclick="addInvoiceItem()">＋ 품목 추가</button>
+          </div>
+          <div style="overflow-x:auto;">
+            <table id="iv-items-table" style="width:100%;border-collapse:collapse;font-size:12px;min-width:1100px;">
+              <thead>
+                <tr style="background:var(--bg3);color:var(--text2);">
+                  <th style="padding:7px 8px;text-align:left;border:1px solid var(--border2);min-width:100px;">카테고리</th>
+                  <th style="padding:7px 8px;text-align:left;border:1px solid var(--border2);min-width:200px;">품목 (LG P/No)</th>
+                  <th style="padding:7px 8px;text-align:right;border:1px solid var(--border2);min-width:80px;">수량</th>
+                  <th style="padding:7px 8px;text-align:center;border:1px solid var(--border2);min-width:50px;">단위</th>
+                  <th style="padding:7px 8px;text-align:right;border:1px solid var(--border2);min-width:90px;">단가 (USD)</th>
+                  <th style="padding:7px 8px;text-align:right;border:1px solid var(--border2);min-width:90px;">금액 (USD)</th>
+                  <th style="padding:7px 8px;text-align:right;border:1px solid var(--border2);min-width:70px;">Net Wt(kg)</th>
+                  <th style="padding:7px 8px;text-align:right;border:1px solid var(--border2);min-width:70px;">Gross Wt(kg)</th>
+                  <th style="padding:7px 8px;text-align:right;border:1px solid var(--border2);min-width:70px;">박스당수량</th>
+                  <th style="padding:7px 8px;text-align:right;border:1px solid var(--border2);min-width:60px;">C/T 수</th>
+                  <th style="padding:7px 8px;text-align:center;border:1px solid var(--border2);min-width:70px;">Pallet No.</th>
+                  <th style="padding:7px 8px;text-align:left;border:1px solid var(--border2);min-width:80px;">HS Code</th>
+                  <th style="padding:7px 8px;text-align:left;border:1px solid var(--border2);min-width:80px;">Maker</th>
+                  <th style="padding:7px 8px;text-align:left;border:1px solid var(--border2);min-width:60px;">Origin</th>
+                  <th style="padding:7px 8px;text-align:center;border:1px solid var(--border2);width:36px;"></th>
+                </tr>
+              </thead>
+              <tbody id="iv-items-body">
+                <tr id="iv-empty-row"><td colspan="15" style="padding:20px;text-align:center;color:var(--text3);font-size:13px;">품목을 추가하세요</td></tr>
+              </tbody>
+              <tfoot>
+                <tr style="background:var(--bg3);font-weight:700;">
+                  <td style="padding:7px 8px;border:1px solid var(--border2);">TOTAL</td>
+                  <td style="border:1px solid var(--border2);"></td>
+                  <td style="padding:7px 8px;text-align:right;border:1px solid var(--border2);" id="iv-total-qty">-</td>
+                  <td style="padding:7px 8px;text-align:center;border:1px solid var(--border2);">pcs</td>
+                  <td style="border:1px solid var(--border2);"></td>
+                  <td style="padding:7px 8px;text-align:right;border:1px solid var(--border2);" id="iv-total-amt">-</td>
+                  <td style="padding:7px 8px;text-align:right;border:1px solid var(--border2);" id="iv-total-net">-</td>
+                  <td style="padding:7px 8px;text-align:right;border:1px solid var(--border2);" id="iv-total-gross">-</td>
+                  <td style="border:1px solid var(--border2);"></td>
+                  <td style="padding:7px 8px;text-align:right;border:1px solid var(--border2);" id="iv-total-ct">-</td>
+                  <td colspan="5" style="border:1px solid var(--border2);"></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        </div>
+
+        <!-- 생성 버튼 -->
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;">
+          <div style="display:flex;gap:10px;">
+            <button class="btn btn-secondary" style="font-size:13px;padding:9px 20px;" onclick="saveInvoiceToDB()">💾 저장</button>
+            <button class="btn btn-secondary" style="font-size:13px;padding:9px 20px;color:var(--text3);" onclick="cancelInvoiceEdit()">✕ 취소</button>
+          </div>
+          <button class="btn btn-primary" style="font-size:14px;padding:10px 28px;" onclick="generateInvoiceExcel()">📥 Invoice + Packing List Excel 생성</button>
+        </div>
+        </div><!-- end iv-form-section -->
+      </div>
+
     </div>
   </div>
 </div>
@@ -1482,7 +1652,11 @@ textarea.form-control{min-height:64px;resize:vertical;}
       <div class="form-group"><label class="form-label">박스 높이 (mm)</label><input class="form-control" type="number" id="if-box-h" min="0" step="0.1" placeholder="예: 200"></div>
       <div class="form-group"><label class="form-label">박스 무게 (KG)</label><input class="form-control" type="number" id="if-box-wt" min="0" step="0.001" placeholder="예: 1.5"></div>
     </div>
-    <div class="form-group" style="margin-bottom:14px;"><label class="form-label">비고</label><input class="form-control" type="text" id="if-note" placeholder="메모 (선택)"></div>
+    <div class="form-grid" style="grid-template-columns:1fr 1fr 2fr;gap:14px;margin-bottom:14px;">
+      <div class="form-group"><label class="form-label">HS Code</label><input class="form-control" type="text" id="if-hscode" placeholder="예: 8532.22-0000" maxlength="20"></div>
+      <div class="form-group"><label class="form-label">원산지 (Origin)</label><input class="form-control" type="text" id="if-origin" placeholder="예: Korea, China, Japan"></div>
+      <div class="form-group"><label class="form-label">비고</label><input class="form-control" type="text" id="if-note" placeholder="메모 (선택)"></div>
+    </div>
     <input type="hidden" id="if-cat" value="기타">
     <input type="hidden" id="if-edit-code">
 
@@ -1779,7 +1953,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
     <div id="hm-in-fields" style="display:none;">
       <div class="form-grid">
         <div class="form-group"><label class="form-label">입고일자 *</label><input class="form-control" type="date" id="hm-date"></div>
-        <div class="form-group"><label class="form-label">입고 수량 *</label><input class="form-control" type="number" id="hm-qty" min="1"></div>
+        <div class="form-group"><label class="form-label">입고 수량 *</label><input class="form-control" type="number" id="hm-qty"></div>
       </div>
       <div class="form-grid">
         <div class="form-group"><label class="form-label">공급업체</label><input class="form-control" type="text" id="hm-supplier" placeholder="공급업체명"></div>
@@ -1802,7 +1976,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
         </div>
       </div>
       <div class="form-grid">
-        <div class="form-group"><label class="form-label">출고 수량 *</label><input class="form-control" type="number" id="hm-out-qty" min="1" oninput="hmCalcAmount()"></div>
+        <div class="form-group"><label class="form-label">출고 수량 *</label><input class="form-control" type="number" id="hm-out-qty" oninput="hmCalcAmount()"></div>
         <div class="form-group"><label class="form-label">적용마감월 <span style="font-size:10px;color:var(--text3);font-weight:400;">비워두면 출고일자 기준</span></label><input class="form-control" type="month" id="hm-billmonth"></div>
       </div>
       <div class="form-grid form-grid-3">
@@ -1949,6 +2123,7 @@ const PAGE_META = {
   forecast:['예상 출고 물량','날짜별 출고 예정 수량을 등록하세요'],
   customers:['거래처 관리','거래처 정보를 등록·관리하세요'],
   filevault:['파일 보관함','엑셀·PDF 등 파일을 업로드하고 다운로드하세요'],
+  invoice:['Invoice / PL 생성','Commercial Invoice와 Packing List Excel을 생성합니다'],
 };
 
 /* ── 데이터 접근자 (Firebase 리스너가 window._items / window._history 를 채움) ── */
@@ -1987,6 +2162,7 @@ window._onDataUpdate = function(type) {
   if(activeTab==='stockalert') renderStockAlert();
   if(activeTab==='filevault') renderFileVault();
   if(activeTab==='customers') renderCustomers();
+  if(activeTab==='invoice') renderIvSavedList();
 };
 
 /* ── 이력 기준 재고 자동 보정 ──
@@ -2169,8 +2345,13 @@ function showToast(msg) {
 /* ── 저장 래퍼 (동기화 상태 표시) ── */
 async function withSync(fn) {
   setSyncState('syncing');
-  try { await fn(); }
-  catch(e) { showToast('⚠ 저장 실패: '+e.message); setSyncState('synced'); }
+  try { await fn(); setSyncState('synced'); }
+  catch(e) {
+    console.error('[withSync] 저장 오류:', e);
+    setSyncState('synced');
+    const msg = e?.message || String(e) || '알 수 없는 오류';
+    alert('⚠ 저장 실패: ' + msg);
+  }
 }
 
 /* ── Nav ── */
@@ -2201,6 +2382,7 @@ function showTab(id) {
   if(id==='stockalert') renderStockAlert();
   if(id==='filevault') renderFileVault();
   if(id==='customers') renderCustomers();
+  if(id==='invoice') renderInvoiceTab();
 }
 
 function getFinance()    { return window._finance    || []; }
@@ -2350,7 +2532,7 @@ function calcAmount(prefix) {
 
   const price = parseFloat(priceEl.value)||0;
   const amt = price * qty;
-  if(amt <= 0) { amountEl.textContent = '—'; return; }
+  if(amt === 0) { amountEl.textContent = '—'; return; }
   const currEl = document.getElementById(prefix+'-currency');
   const curr = currEl ? currEl.value : 'KRW';
   const symEl = document.getElementById(prefix+'-currency-symbol');
@@ -3610,7 +3792,7 @@ function renderHistory() {
       <td class="mono" style="font-size:11px;color:var(--text2)">${code}</td>
       <td style="font-weight:500">${h.itemName}</td>
       <td style="color:var(--text3)">${maker}</td>
-      <td style="font-weight:600;color:${h.type==='in'?'var(--green)':'var(--red)'}">${h.type==='in'?'+':'−'}${h.qty.toLocaleString()}</td>
+      <td style="font-weight:600;color:${h.type==='in'?'var(--green)':'var(--red)'}">${h.qty.toLocaleString()}</td>
       <td style="font-family:monospace;font-size:12px;color:var(--text2)">${h.price?(h.currency==='USD'?'$'+h.price.toLocaleString():h.price.toLocaleString()+'원'):'—'}</td>
       <td style="font-weight:600;color:${h.type==='in'?'var(--green)':'var(--red)'}">${h.amount?(h.currency==='USD'?'$'+h.amount.toLocaleString():won(h.amount)):'—'}</td>
       <td>${h.partner||'—'}</td>
@@ -3735,7 +3917,7 @@ async function saveHistoryEdit() {
   const manager  = isOut ? (document.getElementById('hm-manager').value||'') : '';
   const receiver = isOut ? (document.getElementById('hm-receiver').value||'') : '';
   const supplier = !isOut ? partner : '';
-  if(!newQty||newQty<1){ showToast('⚠ 수량을 입력하세요.'); return; }
+  if(newQty===0||isNaN(newQty)){ showToast('⚠ 수량을 입력하세요.'); return; }
 
   const item = getItem(itemName);
   if(!item){ showToast('⚠ 품목을 찾을 수 없습니다.'); return; }
@@ -3805,6 +3987,7 @@ async function deleteHistory(id) {
 /* ── 입고/출고 제출 ── */
 function clearForm(p) {
   ['item','qty'].forEach(f=>{const el=document.getElementById(p+'-'+f);if(el)el.value='';});
+  const searchEl=document.getElementById(p+'-item-search'); if(searchEl) searchEl.value='';;
   document.getElementById(p+'-date').value=TODAY;
   const amtEl=document.getElementById(p+'-amount'); if(amtEl) amtEl.textContent='—';
   const prEl=document.getElementById(p+'-price'); if(prEl) prEl.value='';
@@ -3828,42 +4011,50 @@ function clearForm(p) {
 }
 
 async function submitIn() {
-  const itemName=document.getElementById('in-item').value;
-  const qty=parseInt(document.getElementById('in-qty').value);
-  const date=document.getElementById('in-date').value;
-  const supplier=document.getElementById('in-supplier').value;
-  const currency=(document.getElementById('in-currency')||{}).value||'KRW';
-  const price=parseFloat(document.getElementById('in-price').value)||0;
-  const amount=price*qty;
-  const paid='paid';
-  const note=(document.getElementById('in-note2')||{}).value||'';
-  const inBoxW=parseFloat(document.getElementById('in-box-w').value)||0;
-  const inBoxD=parseFloat(document.getElementById('in-box-d').value)||0;
-  const inBoxH=parseFloat(document.getElementById('in-box-h').value)||0;
-  const inBoxWt=parseFloat(document.getElementById('in-box-wt').value)||0;
-  if(!itemName){showToast('⚠ 품목을 선택하세요.');return;}
-  if(!qty||qty<1){showToast('⚠ 수량을 입력하세요.');return;}
-  const item=getItem(itemName);
-  if(!item){showToast('⚠ 품목을 찾을 수 없습니다.');return;}
-  const newStock=item.stock+qty;
-  const btn=document.getElementById('btn-submit-in');
-  btn.disabled=true;
-  await withSync(async()=>{
-    await window._db_updateItem(item.code, { stock: newStock });
-    const histRef = await window._db_addHistoryRef({ date, type:'in', itemName, qty, partner:supplier, supplier, afterStock:newStock, note, price, amount, currency, boxW:inBoxW, boxD:inBoxD, boxH:inBoxH, boxWt:inBoxWt, createdBy:getCurrentUserLabel() });
-    await window._db_addFinance({ date, type:'매입', itemName, qty, price, amount, partner:supplier, paid, note, historyId: histRef?.id||'', createdBy:getCurrentUserLabel() });
-    if(paid==='unpaid' && amount>0) {
-      await window._db_addReceivable({ date, type:'미지급', partner:supplier, itemName, amount, status:'미결', dueDate:'' });
-    }
-  });
-  btn.disabled=false;
-  showToast(`✓ 입고 완료: ${itemName} +${qty}${item.unit} / ${won(amount)}`);
-  clearForm('in');
+  try {
+    const itemName=document.getElementById('in-item').value;
+    const qtyRaw=document.getElementById('in-qty').value;
+    const qty=parseInt(qtyRaw);
+    const date=document.getElementById('in-date').value;
+    const supplier=document.getElementById('in-supplier').value;
+    const currency=(document.getElementById('in-currency')||{}).value||'KRW';
+    const price=parseFloat(document.getElementById('in-price').value)||0;
+    const amount=price*qty;
+    const paid='paid';
+    const note=(document.getElementById('in-note2')||{}).value||'';
+    const inBoxW=parseFloat((document.getElementById('in-box-w')||{}).value)||0;
+    const inBoxD=parseFloat((document.getElementById('in-box-d')||{}).value)||0;
+    const inBoxH=parseFloat((document.getElementById('in-box-h')||{}).value)||0;
+    const inBoxWt=parseFloat((document.getElementById('in-box-wt')||{}).value)||0;
+    if(!itemName){alert('⚠ 품목을 선택하세요.');return;}
+    if(qtyRaw===''||qtyRaw==null||isNaN(qty)){alert('⚠ 수량을 입력하세요.');return;}
+    const item=getItem(itemName);
+    if(!item){alert('⚠ 품목을 찾을 수 없습니다.\n\nitemName: "'+itemName+'"\n\n품목 수: '+getItems().length);return;}
+    const newStock=item.stock+qty;
+    const btn=document.getElementById('btn-submit-in');
+    if(btn) btn.disabled=true;
+    await withSync(async()=>{
+      await window._db_updateItem(item.code, { stock: newStock });
+      const histRef = await window._db_addHistoryRef({ date, type:'in', itemName, qty, partner:supplier, supplier, afterStock:newStock, note, price, amount, currency, boxW:inBoxW, boxD:inBoxD, boxH:inBoxH, boxWt:inBoxWt, createdBy:getCurrentUserLabel() });
+      await window._db_addFinance({ date, type:'매입', itemName, qty, price, amount, partner:supplier, paid, note, historyId: histRef?.id||'', createdBy:getCurrentUserLabel() });
+      if(paid==='unpaid' && amount>0) {
+        await window._db_addReceivable({ date, type:'미지급', partner:supplier, itemName, amount, status:'미결', dueDate:'' });
+      }
+    });
+    if(btn) btn.disabled=false;
+    showToast(`✓ 입고 완료: ${itemName} +${qty}${item.unit} / ${won(amount)}`);
+    clearForm('in');
+  } catch(e) {
+    alert('⚠ 입고 등록 오류:\n' + (e?.message || String(e)));
+    const btn=document.getElementById('btn-submit-in');
+    if(btn) btn.disabled=false;
+  }
 }
 
 async function submitOut() {
   const itemName=document.getElementById('out-item').value;
-  const qty=parseInt(document.getElementById('out-qty').value);
+  const qtyRaw=document.getElementById('out-qty').value;
+  const qty=parseInt(qtyRaw);
   const date=document.getElementById('out-date').value;
   const dest=document.getElementById('out-dest').value;
   const seller=document.getElementById('out-seller').value;
@@ -3877,7 +4068,7 @@ async function submitOut() {
   const paid='paid';
   const note=(document.getElementById('out-note2')||{}).value||'';
   if(!itemName){showToast('⚠ 품목을 선택하세요.');return;}
-  if(!qty||qty<1){showToast('⚠ 수량을 입력하세요.');return;}
+  if(qtyRaw===''||qtyRaw==null||isNaN(qty)){showToast('⚠ 수량을 입력하세요.');return;}
   if(!billMonth){
     const mLabel = date ? `${parseInt(date.slice(5,7))}월` : '해당 월';
     const autoMonth = date ? date.slice(0,7) : '';
@@ -3889,7 +4080,7 @@ async function submitOut() {
   }
   const item=getItem(itemName);
   if(!item){showToast('⚠ 품목을 찾을 수 없습니다.');return;}
-  if(item.stock<qty){showToast(`⚠ 재고 부족 (현재: ${item.stock.toLocaleString()}${item.unit})`);return;}
+  if(qty>0 && item.stock<qty){showToast(`⚠ 재고 부족 (현재: ${item.stock.toLocaleString()}${item.unit})`);return;}
   // 단가 수동 변경 시 확인
   const priceEl2=document.getElementById('out-price');
   if(priceEl2?._userEdited && dest && price>0) {
@@ -4280,6 +4471,29 @@ function printStatement(data) {
     .table-border::before{opacity:0.10 !important;}
     .table-border{border:1.5px solid #000 !important;}
   }
+  /* Invoice 품목 자동완성 콤보박스 */
+  .iv-combo-wrap { position:relative; display:inline-block; width:100%; }
+  .iv-combo-input { width:100%; box-sizing:border-box; }
+  .iv-combo-dropdown {
+    position:absolute; left:0; top:100%; z-index:9999;
+    background:var(--surface1); border:1px solid var(--border2);
+    border-radius:6px; box-shadow:0 4px 16px rgba(0,0,0,0.18);
+    max-height:220px; overflow-y:auto; min-width:280px; display:none;
+  }
+  .iv-combo-dropdown.open { display:block; }
+  .iv-combo-group-label {
+    padding:4px 10px; font-size:10px; font-weight:700;
+    color:var(--text3); background:var(--surface2);
+    border-top:1px solid var(--border2); text-transform:uppercase; letter-spacing:0.5px;
+  }
+  .iv-combo-option {
+    padding:5px 12px; font-size:12px; cursor:pointer;
+    border-bottom:1px solid var(--border2); color:var(--text1);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+  }
+  .iv-combo-option:hover, .iv-combo-option.active { background:var(--primary); color:#fff; }
+  .iv-combo-option mark { background:transparent; color:inherit; font-weight:700; }
+  /* 입출고 품목 자동완성 */
 </style>
 </head><body>
 <div class="page">
@@ -4328,7 +4542,7 @@ function checkDuplicateCode() {
 function openItemModal() {
   document.getElementById('modal-title').textContent='품목 추가';
   document.getElementById('if-edit-code').value='';
-  ['if-code','if-name','if-unit','if-safe','if-stock','if-note','if-maker','if-buyprice','if-sellprice','if-leadtime','if-boxqty','if-smallboxqty','if-typename','if-buyprice-date','if-sellprice-date','if-box-w','if-box-d','if-box-h','if-box-wt'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  ['if-code','if-name','if-unit','if-safe','if-stock','if-note','if-maker','if-buyprice','if-sellprice','if-leadtime','if-boxqty','if-smallboxqty','if-typename','if-buyprice-date','if-sellprice-date','if-box-w','if-box-d','if-box-h','if-box-wt','if-hscode','if-origin'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   const bCur=document.getElementById('if-buyprice-cur'); if(bCur) bCur.value='KRW';
   const sCur=document.getElementById('if-sellprice-cur'); if(sCur) sCur.value='KRW';
   const msgEl=document.getElementById('if-code-msg'); if(msgEl) msgEl.textContent='';
@@ -4374,6 +4588,8 @@ function editItem(code) {
   const bdEl=document.getElementById('if-box-d'); if(bdEl) bdEl.value=i.boxD||'';
   const bhEl=document.getElementById('if-box-h'); if(bhEl) bhEl.value=i.boxH||'';
   const bwtEl=document.getElementById('if-box-wt'); if(bwtEl) bwtEl.value=i.boxWt||'';
+  const hsEl=document.getElementById('if-hscode'); if(hsEl) hsEl.value=i.hsCode||'';
+  const origEl=document.getElementById('if-origin'); if(origEl) origEl.value=i.origin||'';
   document.getElementById('item-modal').classList.add('open');
 }
 
@@ -4403,7 +4619,9 @@ async function saveItem() {
     boxW:parseFloat(document.getElementById('if-box-w').value)||0,
     boxD:parseFloat(document.getElementById('if-box-d').value)||0,
     boxH:parseFloat(document.getElementById('if-box-h').value)||0,
-    boxWt:parseFloat(document.getElementById('if-box-wt').value)||0};
+    boxWt:parseFloat(document.getElementById('if-box-wt').value)||0,
+    hsCode:(document.getElementById('if-hscode')?.value||'').trim(),
+    origin:(document.getElementById('if-origin')?.value||'').trim()};
   obj[editCode ? 'updatedBy' : 'createdBy'] = getCurrentUserLabel();
   if(!editCode && getItems().find(i=>i.code===code)){
     const msgEl=document.getElementById('if-code-msg');
@@ -8288,6 +8506,855 @@ function applyScan(raw){
 
 renderDashboard();
 updateAlertBadge();
+
+/* ═══════════════════════════════════════════════════
+   Invoice / Packing List 생성 기능
+═══════════════════════════════════════════════════ */
+let _ivRows = []; // { id, cat, itemCode, itemName, qty, unit, price, netWt, grossWt, boxQty, ctCount, palletNo, hsCode, maker, origin }
+let _ivRowSeq = 0;
+let _ivEditingId = null; // 현재 수정 중인 Invoice Firestore 문서 ID
+
+function getInvoices() { return window._invoices || []; }
+
+function renderInvoiceTab() {
+  renderIvSavedList();
+  // 거래처 드롭다운 채우기
+  const sel = document.getElementById('iv-consignee');
+  if(!sel) return;
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">-- 거래처 선택 --</option>';
+  getCustomers().forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c._id || c.id;
+    opt.textContent = c.name;
+    sel.appendChild(opt);
+  });
+  if(cur) sel.value = cur;
+  if(!document.getElementById('iv-date').value) {
+    document.getElementById('iv-date').value = new Date().toISOString().slice(0,10);
+  }
+  renderIvItemsTable();
+}
+
+function renderIvSavedList() {
+  const list = getInvoices();
+  const el = document.getElementById('iv-saved-list');
+  if(!el) return;
+  if(list.length === 0) {
+    el.innerHTML = '<div style="color:var(--text3);font-size:13px;padding:10px 0;">저장된 Invoice가 없습니다.</div>';
+    return;
+  }
+  el.innerHTML = `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="background:var(--bg3);color:var(--text2);">
+      <th style="padding:7px 10px;text-align:left;border:1px solid var(--border2);">Invoice No.</th>
+      <th style="padding:7px 10px;text-align:left;border:1px solid var(--border2);">날짜</th>
+      <th style="padding:7px 10px;text-align:left;border:1px solid var(--border2);">Consignee</th>
+      <th style="padding:7px 10px;text-align:right;border:1px solid var(--border2);">품목 수</th>
+      <th style="padding:7px 10px;text-align:right;border:1px solid var(--border2);">총 금액 (USD)</th>
+      <th style="padding:7px 10px;text-align:center;border:1px solid var(--border2);">저장일</th>
+      <th style="padding:7px 10px;text-align:center;border:1px solid var(--border2);width:150px;">관리</th>
+    </tr></thead>
+    <tbody>
+    ${list.map(iv => {
+      const totAmt = (iv.rows||[]).reduce((s,r)=>s+(r.qty||0)*(r.price||0),0);
+      const savedAt = iv.createdAt?.toDate ? iv.createdAt.toDate().toLocaleDateString('ko-KR') : '';
+      return `<tr>
+        <td style="padding:7px 10px;border:1px solid var(--border2);font-weight:600;">${iv.ivNo||''}</td>
+        <td style="padding:7px 10px;border:1px solid var(--border2);">${iv.ivDate||''}</td>
+        <td style="padding:7px 10px;border:1px solid var(--border2);">${iv.consigneeName||''}</td>
+        <td style="padding:7px 10px;border:1px solid var(--border2);text-align:right;">${(iv.rows||[]).length}개</td>
+        <td style="padding:7px 10px;border:1px solid var(--border2);text-align:right;font-weight:600;">$${totAmt.toFixed(2)}</td>
+        <td style="padding:7px 10px;border:1px solid var(--border2);text-align:center;color:var(--text3);font-size:12px;">${savedAt}</td>
+        <td style="padding:7px 10px;border:1px solid var(--border2);text-align:center;">
+          <button class="btn btn-secondary" style="font-size:11px;padding:3px 10px;margin-right:4px;" onclick="loadInvoice('${iv._id}')">불러오기</button>
+          <button class="btn btn-secondary" style="font-size:11px;padding:3px 10px;color:var(--red);" onclick="deleteInvoice('${iv._id}','${(iv.ivNo||'').replace(/'/g,"\\'")}')">삭제</button>
+        </td>
+      </tr>`;
+    }).join('')}
+    </tbody>
+  </table>`;
+}
+
+function startNewInvoice() {
+  _ivEditingId = null;
+  _ivRows = [];
+  _ivRowSeq = 0;
+  // 폼 초기화
+  ['iv-no','iv-shipper-attn','iv-consignee-addr','iv-consignee-attn','iv-sailing'].forEach(id => {
+    const el = document.getElementById(id); if(el) el.value = '';
+  });
+  document.getElementById('iv-consignee').value = '';
+  document.getElementById('iv-pol').value = 'Busan, Korea';
+  document.getElementById('iv-carrier').value = 'By Vessel';
+  document.getElementById('iv-date').value = new Date().toISOString().slice(0,10);
+  const _now = new Date();
+  const _mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][_now.getMonth()];
+  document.getElementById('iv-sailing').value = `${_mon}. ${_now.getFullYear()}`;
+  const lbl = document.getElementById('iv-editing-label'); if(lbl) lbl.textContent = '새 Invoice';
+  document.getElementById('iv-form-section').style.display = '';
+  renderIvItemsTable();
+}
+
+function loadInvoice(id) {
+  const iv = getInvoices().find(x => x._id === id);
+  if(!iv) return;
+  _ivEditingId = id;
+  _ivRows = (iv.rows||[]).map(r => {
+    const item = getItems().find(x => x.code === r.itemCode);
+    return { ...r, id: ++_ivRowSeq, _boxWt: item?.boxWt || r._boxWt || 0 };
+  });
+  // 폼 채우기
+  document.getElementById('iv-no').value = iv.ivNo||'';
+  document.getElementById('iv-date').value = iv.ivDate||'';
+  document.getElementById('iv-shipper-attn').value = iv.shipperAttn||'';
+  document.getElementById('iv-consignee-addr').value = iv.consigneeAddr||'';
+  document.getElementById('iv-consignee-attn').value = iv.consigneeAttn||'';
+  document.getElementById('iv-pol').value = iv.pol||'Busan, Korea';
+  document.getElementById('iv-pod').value = iv.pod||'';
+  document.getElementById('iv-carrier').value = iv.carrier||'By Vessel';
+  document.getElementById('iv-sailing').value = iv.sailing||'';
+  // 거래처 드롭다운
+  const sel = document.getElementById('iv-consignee');
+  if(sel && iv.consigneeId) sel.value = iv.consigneeId;
+  const lbl = document.getElementById('iv-editing-label');
+  if(lbl) lbl.textContent = '수정 중: ' + (iv.ivNo||id);
+  document.getElementById('iv-form-section').style.display = '';
+  renderIvItemsTable();
+  // 스크롤
+  document.getElementById('iv-form-section').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+function cancelInvoiceEdit() {
+  _ivEditingId = null;
+  _ivRows = [];
+  document.getElementById('iv-form-section').style.display = 'none';
+  const lbl = document.getElementById('iv-editing-label'); if(lbl) lbl.textContent = '';
+}
+
+async function saveInvoiceToDB() {
+  const ivNo = document.getElementById('iv-no').value.trim();
+  if(!ivNo) { showToast('⚠ Invoice No.를 입력하세요.'); return; }
+  if(_ivRows.length === 0) { showToast('⚠ 품목을 먼저 추가하세요.'); return; }
+
+  const consSel = document.getElementById('iv-consignee');
+  const consId  = consSel.value;
+  const consName= consId ? (getCustomers().find(c=>(c._id||c.id)===consId)||{}).name||consSel.options[consSel.selectedIndex]?.text||'' : '';
+
+  const obj = {
+    ivNo,
+    ivDate:          document.getElementById('iv-date').value,
+    shipperAttn:     document.getElementById('iv-shipper-attn').value.trim(),
+    consigneeId:     consId,
+    consigneeName:   consName,
+    consigneeAddr:   document.getElementById('iv-consignee-addr').value.trim(),
+    consigneeAttn:   document.getElementById('iv-consignee-attn').value.trim(),
+    pol:             document.getElementById('iv-pol').value.trim(),
+    pod:             document.getElementById('iv-pod').value.trim(),
+    carrier:         document.getElementById('iv-carrier').value.trim(),
+    sailing:         document.getElementById('iv-sailing').value.trim(),
+    rows:            _ivRows.map(({ id, ...rest }) => rest), // id 제외 저장
+    savedBy:         getCurrentUserLabel(),
+  };
+
+  try {
+    if(_ivEditingId) {
+      await window._db_updateInvoice(_ivEditingId, obj);
+      showToast('✓ Invoice 수정 저장 완료');
+    } else {
+      const ref = await window._db_addInvoice(obj);
+      _ivEditingId = ref.id;
+      const lbl = document.getElementById('iv-editing-label');
+      if(lbl) lbl.textContent = '수정 중: ' + ivNo;
+      showToast('✓ Invoice 저장 완료');
+    }
+  } catch(e) {
+    showToast('⚠ 저장 오류: ' + e.message);
+  }
+}
+
+async function deleteInvoice(id, ivNo) {
+  if(!confirm(`"${ivNo}" Invoice를 삭제하시겠습니까?`)) return;
+  try {
+    await window._db_deleteInvoice(id);
+    showToast('✓ 삭제 완료');
+    if(_ivEditingId === id) cancelInvoiceEdit();
+  } catch(e) {
+    showToast('⚠ 삭제 오류: ' + e.message);
+  }
+}
+
+function onConsigneeChange() {
+  const sel = document.getElementById('iv-consignee');
+  const id = sel.value;
+  if(!id) return;
+  const c = getCustomers().find(x => (x._id||x.id) === id);
+  if(!c) return;
+  document.getElementById('iv-consignee-addr').value = c.addr || '';
+  const attn = [c.manager, c.tel].filter(Boolean).join(' / ');
+  document.getElementById('iv-consignee-attn').value = attn ? 'Mr./Ms. ' + attn : '';
+}
+
+function addInvoiceItem() {
+  const id = ++_ivRowSeq;
+  _ivRows.push({ id, cat:'', itemCode:'', itemName:'', qty:0, unit:'pcs', price:0, netWt:0, grossWt:0, boxQty:0, ctCount:0, palletNo:'1', hsCode:'', maker:'', origin:'' });
+  renderIvItemsTable();
+  // 마지막 행의 카테고리 필드에 포커스
+  setTimeout(() => {
+    const el = document.getElementById('iv-cat-'+id);
+    if(el) el.focus();
+  }, 50);
+}
+
+function removeInvoiceItem(id) {
+  _ivRows = _ivRows.filter(r => r.id !== id);
+  renderIvItemsTable();
+}
+
+function ivItemField(id, field, value) {
+  const row = _ivRows.find(r => r.id === id);
+  if(!row) return;
+  row[field] = value;
+  if(field === 'qty') { recalcIvCtGross(id); }
+  if(field === 'boxQty') { row._boxWt = row._boxWt || 0; recalcIvCtGross(id); }
+  updateIvTotals();
+}
+
+function onIvItemSelect(id, selectEl) {
+  const val = selectEl.value;
+  const row = _ivRows.find(r => r.id === id);
+  if(!row) return;
+  if(!val) { row.itemCode=''; row.itemName=''; row.unit='pcs'; row.hsCode=''; row.maker=''; row.origin=''; return; }
+  const item = getItems().find(i => i.code === val);
+  if(!item) return;
+
+  row.itemCode  = item.code;
+  row.itemName  = item.name;
+  row.unit      = item.unit || 'pcs';
+  row.hsCode    = item.hsCode || '';
+  row.maker     = item.maker || '';
+  row.origin    = item.origin || '';
+  row.boxQty    = item.boxQty || 0;
+  row._boxWt    = item.boxWt || 0; // 계산용 보관
+
+  // 카테고리: typeName 이 있고 현재 비어있으면 채움
+  if(item.typeName) {
+    const catEl = document.getElementById('iv-cat-'+id);
+    if(catEl && !catEl.value) { catEl.value = item.typeName; row.cat = item.typeName; }
+  }
+
+  // USD 단가: buyCurrency 가 USD 이면 자동
+  if(item.buyCurrency === 'USD' && item.buyPrice) {
+    row.price = item.buyPrice;
+    const pEl = document.getElementById('iv-price-'+id); if(pEl) pEl.value = item.buyPrice;
+  }
+
+  const sv = (elId, v) => { const e=document.getElementById(elId); if(e) e.value=v; };
+  sv('iv-unit-'+id,   row.unit);
+  sv('iv-hs-'+id,     row.hsCode);
+  sv('iv-maker-'+id,  row.maker);
+  sv('iv-origin-'+id, row.origin);
+  sv('iv-boxqty-'+id, row.boxQty || '');
+
+  // qty 가 이미 입력돼 있으면 C/T·Gross Wt 즉시 계산
+  recalcIvCtGross(id);
+  updateIvTotals();
+}
+
+// qty 변경 시 C/T 수, Gross Wt 자동 계산
+function recalcIvCtGross(id) {
+  const row = _ivRows.find(r => r.id === id);
+  if(!row) return;
+  const qty    = row.qty    || 0;
+  const boxQty = row.boxQty || 0;
+  const boxWt  = row._boxWt || 0;
+  if(qty > 0 && boxQty > 0 && boxWt > 0) {
+    const ct = Math.ceil(qty / boxQty);
+    row.ctCount  = ct;
+    row.grossWt  = Math.round(ct * boxWt * 1000) / 1000;
+    const ctEl = document.getElementById('iv-ct-'+id);    if(ctEl)    ctEl.value    = row.ctCount;
+    const gwEl = document.getElementById('iv-gross-'+id); if(gwEl)    gwEl.value    = row.grossWt;
+  }
+}
+
+function _ivComboHtml(rowId, selectedCode) {
+  // 자동완성 콤보박스 HTML 생성
+  const displayVal = selectedCode ? (() => {
+    const it = getItems().find(i => i.code === selectedCode);
+    return it ? `${it.code} — ${it.name}` : selectedCode;
+  })() : '';
+  return `<div class="iv-combo-wrap" id="iv-combo-wrap-${rowId}">
+    <input class="form-control iv-combo-input" type="text" id="iv-combo-${rowId}"
+      value="${displayVal.replace(/"/g,'&quot;')}"
+      placeholder="품목 검색 (코드/이름)"
+      style="font-size:12px;padding:4px 6px;"
+      autocomplete="off"
+      onfocus="ivComboOpen(${rowId})"
+      oninput="ivComboFilter(${rowId},this.value)"
+      onkeydown="ivComboKey(event,${rowId})">
+    <div class="iv-combo-dropdown" id="iv-combo-dd-${rowId}"></div>
+  </div>`;
+}
+
+function ivComboOpen(rowId) {
+  const inp = document.getElementById('iv-combo-'+rowId);
+  ivComboFilter(rowId, inp ? inp.value : '');
+}
+
+function ivComboFilter(rowId, q) {
+  const dd = document.getElementById('iv-combo-dd-'+rowId);
+  if(!dd) return;
+  const items = getItems();
+  const ql = q.trim().toLowerCase();
+  // 그룹별 필터
+  const itemsByType = {};
+  items.forEach(i => {
+    const match = !ql || i.code.toLowerCase().includes(ql) || (i.name||'').toLowerCase().includes(ql) || (i.typeName||'').toLowerCase().includes(ql);
+    if(!match) return;
+    const grp = i.typeName || '기타';
+    if(!itemsByType[grp]) itemsByType[grp] = [];
+    itemsByType[grp].push(i);
+  });
+  const esc = s => s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const hl = s => {
+    if(!ql) return esc(s);
+    const idx = s.toLowerCase().indexOf(ql);
+    if(idx<0) return esc(s);
+    return esc(s.slice(0,idx))+'<mark>'+esc(s.slice(idx,idx+ql.length))+'</mark>'+esc(s.slice(idx+ql.length));
+  };
+  let html = '';
+  let totalCount = 0;
+  Object.entries(itemsByType).forEach(([grp, its]) => {
+    html += `<div class="iv-combo-group-label">${esc(grp)}</div>`;
+    its.forEach(i => {
+      totalCount++;
+      html += `<div class="iv-combo-option" data-code="${esc(i.code)}" data-rowid="${rowId}" onclick="ivComboSelect(${rowId},'${i.code.replace(/'/g,"\\'")}',\`${(i.code+' — '+i.name).replace(/`/g,'\\`')}\`)">${hl(i.code)} — ${hl(i.name||'')}</div>`;
+    });
+  });
+  if(totalCount === 0) html = `<div class="iv-combo-option" style="color:var(--text3);cursor:default;">검색 결과 없음</div>`;
+  dd.innerHTML = html;
+  dd.classList.add('open');
+  // 현재 선택된 항목 표시
+  const row = _ivRows.find(r=>r.id===rowId);
+  if(row && row.itemCode) {
+    const opt = dd.querySelector(`[data-code="${row.itemCode}"]`);
+    if(opt) opt.classList.add('active');
+  }
+}
+
+function ivComboSelect(rowId, code, label) {
+  const inp = document.getElementById('iv-combo-'+rowId);
+  const dd = document.getElementById('iv-combo-dd-'+rowId);
+  if(inp) inp.value = label;
+  if(dd) dd.classList.remove('open');
+  // onIvItemSelect 호출
+  const fakeEl = { value: code };
+  onIvItemSelect(rowId, fakeEl);
+  ivItemField(rowId, 'itemCode', code);
+}
+
+function ivComboKey(evt, rowId) {
+  const dd = document.getElementById('iv-combo-dd-'+rowId);
+  if(!dd || !dd.classList.contains('open')) return;
+  const opts = [...dd.querySelectorAll('.iv-combo-option:not([style*="cursor:default"])')];
+  const cur = dd.querySelector('.iv-combo-option.active');
+  let idx = opts.indexOf(cur);
+  if(evt.key === 'ArrowDown') { evt.preventDefault(); idx = Math.min(idx+1, opts.length-1); }
+  else if(evt.key === 'ArrowUp') { evt.preventDefault(); idx = Math.max(idx-1, 0); }
+  else if(evt.key === 'Enter') {
+    evt.preventDefault();
+    if(cur) cur.click();
+    return;
+  } else if(evt.key === 'Escape') {
+    dd.classList.remove('open');
+    return;
+  } else return;
+  opts.forEach(o=>o.classList.remove('active'));
+  if(opts[idx]) { opts[idx].classList.add('active'); opts[idx].scrollIntoView({block:'nearest'}); }
+}
+
+// 콤보박스 외부 클릭 시 닫기
+document.addEventListener('click', function(e) {
+  if(e.target.classList.contains('iv-combo-input') || e.target.classList.contains('iv-combo-option')) return;
+  document.querySelectorAll('.iv-combo-dropdown.open').forEach(dd => dd.classList.remove('open'));
+  if(!e.target.closest('.inout-combo-wrap')) {
+    document.querySelectorAll('.inout-combo-dropdown.open').forEach(dd => dd.classList.remove('open'));
+  }
+});
+
+/* ── 입출고 품목 자동완성 ── */
+function inoutComboOpen(prefix) {
+  inoutComboFilter(prefix, document.getElementById(prefix+'-item-search').value);
+}
+function inoutComboFilter(prefix, q) {
+  const dropdown = document.getElementById(prefix+'-item-dropdown');
+  if(!dropdown) return;
+  const items = getItems();
+  const lq = (q||'').toLowerCase().trim();
+  const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const hl  = (txt, q) => q ? txt.replace(new RegExp(esc(q),'gi'), m=>`<mark>${m}</mark>`) : txt;
+  const filtered = lq ? items.filter(i => i.code.toLowerCase().includes(lq) || i.name.toLowerCase().includes(lq)) : items;
+  if(filtered.length === 0) {
+    dropdown.innerHTML = '<div style="padding:8px 12px;color:var(--text3);font-size:12px;">검색 결과 없음</div>';
+  } else {
+    dropdown.innerHTML = filtered.map(i => {
+      const safeName = i.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+      return `<div class="inout-combo-option" onclick="inoutComboSelect('${prefix}','${safeName}')">` +
+        `<span class="ico-code">${hl(i.code,lq)}</span>` +
+        `<span class="ico-sep">—</span>` +
+        `<span class="ico-name">${hl(i.name,lq)}</span>` +
+        `<span class="ico-stock">(현재고: ${i.stock.toLocaleString()}${i.unit})</span>` +
+        `</div>`;
+    }).join('');
+  }
+  dropdown.classList.add('open');
+}
+function inoutComboSelect(prefix, name) {
+  const sel = document.getElementById(prefix+'-item');
+  const inp = document.getElementById(prefix+'-item-search');
+  const item = getItem(name);
+  if(sel) sel.value = name;
+  if(inp) inp.value = item ? `${item.code} — ${item.name}` : name;
+  const dd = document.getElementById(prefix+'-item-dropdown');
+  if(dd) dd.classList.remove('open');
+  if(sel) sel.dispatchEvent(new Event('change'));
+}
+function inoutComboKey(evt, prefix) {
+  const dd = document.getElementById(prefix+'-item-dropdown');
+  if(!dd) return;
+  if(!dd.classList.contains('open')) { inoutComboOpen(prefix); return; }
+  const opts = Array.from(dd.querySelectorAll('.inout-combo-option'));
+  if(!opts.length) return;
+  const cur = dd.querySelector('.inout-combo-option.active');
+  const idx = opts.indexOf(cur);
+  if(evt.key==='ArrowDown') {
+    evt.preventDefault();
+    const nxt = idx < opts.length-1 ? opts[idx+1] : opts[0];
+    opts.forEach(o=>o.classList.remove('active')); nxt.classList.add('active'); nxt.scrollIntoView({block:'nearest'});
+  } else if(evt.key==='ArrowUp') {
+    evt.preventDefault();
+    const prv = idx>0 ? opts[idx-1] : opts[opts.length-1];
+    opts.forEach(o=>o.classList.remove('active')); prv.classList.add('active'); prv.scrollIntoView({block:'nearest'});
+  } else if(evt.key==='Enter') {
+    evt.preventDefault(); if(cur) cur.click();
+  } else if(evt.key==='Escape') {
+    dd.classList.remove('open');
+  }
+}
+
+function renderIvItemsTable() {
+  const tbody = document.getElementById('iv-items-body');
+  if(!tbody) return;
+  if(_ivRows.length === 0) {
+    tbody.innerHTML = '<tr id="iv-empty-row"><td colspan="15" style="padding:20px;text-align:center;color:var(--text3);font-size:13px;">품목을 추가하세요</td></tr>';
+    updateIvTotals();
+    return;
+  }
+  tbody.innerHTML = _ivRows.map(row => `
+    <tr id="iv-row-${row.id}">
+      <td style="padding:4px 6px;border:1px solid var(--border2);">
+        <input class="form-control" type="text" id="iv-cat-${row.id}" value="${row.cat}" placeholder="IR Receiver" style="font-size:12px;padding:4px 6px;" oninput="ivItemField(${row.id},'cat',this.value)">
+      </td>
+      <td style="padding:4px 6px;border:1px solid var(--border2);min-width:200px;">
+        ${_ivComboHtml(row.id, row.itemCode)}
+      </td>
+      <td style="padding:4px 6px;border:1px solid var(--border2);">
+        <input class="form-control" type="number" id="iv-qty-${row.id}" value="${row.qty||''}" min="0" style="font-size:12px;padding:4px 6px;text-align:right;" oninput="ivItemField(${row.id},'qty',parseFloat(this.value)||0)">
+      </td>
+      <td style="padding:4px 6px;border:1px solid var(--border2);">
+        <input class="form-control" type="text" id="iv-unit-${row.id}" value="${row.unit}" style="font-size:12px;padding:4px 6px;text-align:center;width:50px;" oninput="ivItemField(${row.id},'unit',this.value)">
+      </td>
+      <td style="padding:4px 6px;border:1px solid var(--border2);">
+        <input class="form-control" type="number" id="iv-price-${row.id}" value="${row.price||''}" min="0" step="0.00001" style="font-size:12px;padding:4px 6px;text-align:right;" oninput="ivItemField(${row.id},'price',parseFloat(this.value)||0)">
+      </td>
+      <td style="padding:4px 6px;border:1px solid var(--border2);text-align:right;font-weight:600;" id="iv-amt-${row.id}">${((row.qty||0)*(row.price||0)).toFixed(3)}</td>
+      <td style="padding:4px 6px;border:1px solid var(--border2);">
+        <input class="form-control" type="number" id="iv-net-${row.id}" value="${row.netWt||''}" min="0" step="0.001" style="font-size:12px;padding:4px 6px;text-align:right;" oninput="ivItemField(${row.id},'netWt',parseFloat(this.value)||0)">
+      </td>
+      <td style="padding:4px 6px;border:1px solid var(--border2);">
+        <input class="form-control" type="number" id="iv-gross-${row.id}" value="${row.grossWt||''}" min="0" step="0.001" style="font-size:12px;padding:4px 6px;text-align:right;" oninput="ivItemField(${row.id},'grossWt',parseFloat(this.value)||0)">
+      </td>
+      <td style="padding:4px 6px;border:1px solid var(--border2);">
+        <input class="form-control" type="number" id="iv-boxqty-${row.id}" value="${row.boxQty||''}" min="0" style="font-size:12px;padding:4px 6px;text-align:right;" oninput="ivItemField(${row.id},'boxQty',parseFloat(this.value)||0)">
+      </td>
+      <td style="padding:4px 6px;border:1px solid var(--border2);">
+        <input class="form-control" type="number" id="iv-ct-${row.id}" value="${row.ctCount||''}" min="0" style="font-size:12px;padding:4px 6px;text-align:right;" oninput="ivItemField(${row.id},'ctCount',parseFloat(this.value)||0)">
+      </td>
+      <td style="padding:4px 6px;border:1px solid var(--border2);">
+        <input class="form-control" type="text" id="iv-pallet-${row.id}" value="${row.palletNo||'1'}" style="font-size:12px;padding:4px 6px;text-align:center;width:60px;" oninput="ivItemField(${row.id},'palletNo',this.value)">
+      </td>
+      <td style="padding:4px 6px;border:1px solid var(--border2);">
+        <input class="form-control" type="text" id="iv-hs-${row.id}" value="${row.hsCode||''}" placeholder="8532.22" style="font-size:12px;padding:4px 6px;" oninput="ivItemField(${row.id},'hsCode',this.value)">
+      </td>
+      <td style="padding:4px 6px;border:1px solid var(--border2);">
+        <input class="form-control" type="text" id="iv-maker-${row.id}" value="${row.maker||''}" style="font-size:12px;padding:4px 6px;" oninput="ivItemField(${row.id},'maker',this.value)">
+      </td>
+      <td style="padding:4px 6px;border:1px solid var(--border2);">
+        <input class="form-control" type="text" id="iv-origin-${row.id}" value="${row.origin||''}" placeholder="Korea" style="font-size:12px;padding:4px 6px;" oninput="ivItemField(${row.id},'origin',this.value)">
+      </td>
+      <td style="padding:4px 6px;border:1px solid var(--border2);text-align:center;">
+        <button class="btn btn-secondary" style="padding:2px 8px;font-size:11px;color:var(--red);" onclick="removeInvoiceItem(${row.id})">✕</button>
+      </td>
+    </tr>
+  `).join('');
+  updateIvTotals();
+}
+
+function updateIvTotals() {
+  const totQty = _ivRows.reduce((s,r)=>s+(r.qty||0),0);
+  const totAmt = _ivRows.reduce((s,r)=>s+(r.qty||0)*(r.price||0),0);
+  const totNet = _ivRows.reduce((s,r)=>s+(r.netWt||0),0);
+  const totGross = _ivRows.reduce((s,r)=>s+(r.grossWt||0),0);
+  const totCt = _ivRows.reduce((s,r)=>s+(r.ctCount||0),0);
+  const qEl = document.getElementById('iv-total-qty'); if(qEl) qEl.textContent = totQty > 0 ? totQty.toLocaleString() : '-';
+  const aEl = document.getElementById('iv-total-amt'); if(aEl) aEl.textContent = totAmt > 0 ? '$'+totAmt.toFixed(3) : '-';
+  const nEl = document.getElementById('iv-total-net'); if(nEl) nEl.textContent = totNet > 0 ? totNet.toFixed(3)+' kg' : '-';
+  const gEl = document.getElementById('iv-total-gross'); if(gEl) gEl.textContent = totGross > 0 ? totGross.toFixed(3)+' kg' : '-';
+  const cEl = document.getElementById('iv-total-ct'); if(cEl) cEl.textContent = totCt > 0 ? totCt+' C/T' : '-';
+  // 각 행 금액 업데이트
+  _ivRows.forEach(row => {
+    const amtEl = document.getElementById('iv-amt-'+row.id);
+    if(amtEl) amtEl.textContent = ((row.qty||0)*(row.price||0)).toFixed(3);
+  });
+}
+
+async function generateInvoiceExcel() {
+  if(_ivRows.length === 0) { showToast('⚠ 품목을 먼저 추가하세요.'); return; }
+  const ivNo    = document.getElementById('iv-no').value.trim() || 'INVOICE';
+  const ivDate  = document.getElementById('iv-date').value;
+  const shipAttn= document.getElementById('iv-shipper-attn').value.trim();
+  const consSel = document.getElementById('iv-consignee');
+  const consId  = consSel.value;
+  const consName= consId ? (getCustomers().find(c=>c.id===consId)||{}).name||consSel.options[consSel.selectedIndex].text : '';
+  const consAddr= document.getElementById('iv-consignee-addr').value.trim();
+  const consAttn= document.getElementById('iv-consignee-attn').value.trim();
+  const pol     = document.getElementById('iv-pol').value.trim();
+  const pod     = document.getElementById('iv-pod').value.trim();
+  const carrier = document.getElementById('iv-carrier').value.trim();
+  const sailing = document.getElementById('iv-sailing').value.trim();
+
+  // 날짜 포맷: "Mar .13 .2025"
+  const fmtDate = ivDate ? (() => {
+    const d = new Date(ivDate);
+    const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()];
+    return `${mon} .${String(d.getDate()).padStart(2,'0')} .${d.getFullYear()}`;
+  })() : '';
+
+  showToast('Excel 생성 중...');
+
+  try {
+    const wb = new ExcelJS.Workbook();
+    wb.creator = 'UNISOLEC ERP';
+    wb.created = new Date();
+
+    // ─── 공통 헬퍼 ───
+    const thin = { style:'thin', color:{argb:'FF888888'} };
+    const medium = { style:'medium', color:{argb:'FF333333'} };
+    const thinBorder = { top:thin, left:thin, bottom:thin, right:thin };
+    const medBorder  = { top:medium, left:medium, bottom:medium, right:medium };
+
+    function hdr(ws, row, col, val, opts={}) {
+      const c = ws.getCell(row, col);
+      c.value = val;
+      c.font = { name:'Arial', size:opts.sz||9, bold:opts.bold||false, color:{argb:opts.color||'FF000000'} };
+      c.alignment = { vertical:'middle', horizontal:opts.h||'left', wrapText:!!opts.wrap };
+      if(opts.border) c.border = opts.border === 'med' ? medBorder : thinBorder;
+      if(opts.fill) c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:opts.fill} };
+      return c;
+    }
+
+    function mergeHdr(ws, r1, c1, r2, c2, val, opts={}) {
+      ws.mergeCells(r1, c1, r2, c2);
+      return hdr(ws, r1, c1, val, opts);
+    }
+
+    // ══════════════════════════════════════════════
+    // Sheet 1: Commercial Invoice
+    // ══════════════════════════════════════════════
+    const ivSheet = wb.addWorksheet('IV');
+    ivSheet.columns = [
+      { width:38 }, // A
+      { width:14 }, // B
+      { width:6  }, // C
+      { width:26 }, // D
+      { width:24 }, // E
+    ];
+
+    // Row 1: Title
+    mergeHdr(ivSheet,1,1,1,5,'COMMERCIAL INVOICE',{sz:14,bold:true,h:'center',fill:'FFD9EAD3'});
+    ivSheet.getRow(1).height = 22;
+
+    // Row 2: Section headers
+    hdr(ivSheet,2,1,'1) Shipper/Exporter',{bold:true});
+    hdr(ivSheet,2,4,'8) No. & date of invoice',{bold:true});
+    // Row 3: Shipper name | Invoice No + Date
+    hdr(ivSheet,3,1,'   UNISOLEC CO., LTD',{bold:true});
+    hdr(ivSheet,3,4,'    '+ivNo);
+    hdr(ivSheet,3,5,fmtDate);
+    // Row 4
+    hdr(ivSheet,4,1,'   #809, Nex Zone, SK Technopark, Wanamro 50, Seongsan-gu');
+    hdr(ivSheet,4,4,'9) No. & date of L/C',{bold:true});
+    // Row 5
+    hdr(ivSheet,5,1,'   Changwon-si, Korea');
+    hdr(ivSheet,5,4,'    N/A');
+    // Row 6
+    if(shipAttn) hdr(ivSheet,6,1,'   Attn : '+shipAttn);
+    // Row 7
+    hdr(ivSheet,7,1,'2) For account & Risk of messrs',{bold:true});
+    hdr(ivSheet,7,4,'10) L/C issuing bank',{bold:true});
+    // Row 8
+    hdr(ivSheet,8,1,'    '+consName);
+    hdr(ivSheet,8,4,'     N/A');
+    // Row 9
+    if(consAddr) {
+      const addrLines = consAddr.split(',');
+      hdr(ivSheet,9,1,'    '+addrLines.slice(0,-1).join(',').trim());
+      if(addrLines.length > 1) hdr(ivSheet,10,1,'    '+addrLines[addrLines.length-1].trim());
+    }
+    // Row 11
+    if(consAttn) hdr(ivSheet,11,1,'    Attn : '+consAttn);
+    // Row 12
+    hdr(ivSheet,12,1,'3) Notify party',{bold:true});
+    hdr(ivSheet,12,4,'11) Remarks',{bold:true});
+    // Row 13
+    hdr(ivSheet,13,1,'   Same as above');
+    // HS Codes from items (unique categories)
+    const hsCodes = [];
+    const catMap = {};
+    _ivRows.forEach(r => {
+      if(r.cat && r.hsCode && !catMap[r.cat]) {
+        catMap[r.cat] = r.hsCode;
+        hsCodes.push(r.cat + ' : ' + r.hsCode);
+      }
+    });
+    hsCodes.forEach((hs, i) => hdr(ivSheet, 13+i, 5, hs));
+    if(hsCodes.length > 0) hdr(ivSheet, 13, 4, 'HS CODE',{bold:true});
+
+    const remarkRows = Math.max(hsCodes.length, 2);
+    const portRow = 15 + remarkRows - 2;
+
+    // Port rows
+    hdr(ivSheet,portRow,1,'4) Port of loading',{bold:true});
+    hdr(ivSheet,portRow,2,'5) Final destination',{bold:true});
+    hdr(ivSheet,portRow+1,1,'    '+pol);
+    hdr(ivSheet,portRow+1,2,'     '+pod);
+    hdr(ivSheet,portRow+2,1,'6) Carrier',{bold:true});
+    hdr(ivSheet,portRow+2,2,'7) Sailing on/or about',{bold:true});
+    hdr(ivSheet,portRow+3,1,'    '+carrier);
+    hdr(ivSheet,portRow+3,2,'      '+sailing);
+    const marksRow = portRow+5;
+    mergeHdr(ivSheet, marksRow, 1, marksRow, 5, '12) Marks & Nos.', {bold:true});
+    ivSheet.getRow(marksRow).height = 10;
+
+    // Column headers for items
+    const colHdrRow = marksRow + 2;
+    const r = ivSheet.getRow(colHdrRow);
+    r.height = 18;
+    ['13) Desc. Of goods', '14) Quantity', '', '15) Price', '16) Amount'].forEach((v,i) => {
+      const c = ivSheet.getCell(colHdrRow, i+1);
+      c.value = v;
+      c.font = { name:'Arial', size:9, bold:true };
+      c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFD9EAD3'} };
+      c.alignment = { vertical:'middle', horizontal: i===0?'left':'center' };
+      c.border = thinBorder;
+    });
+
+    // Items
+    let curRow = colHdrRow + 1;
+    let lastCat = null;
+    _ivRows.forEach(row => {
+      if(row.cat !== lastCat) {
+        // Category header row
+        mergeHdr(ivSheet, curRow, 1, curRow, 5, row.cat, {bold:true, sz:9});
+        ivSheet.getRow(curRow).height = 15;
+        curRow++;
+        lastCat = row.cat;
+      }
+      const itemLabel = row.itemCode ? row.itemCode+(row.itemName?' ('+row.itemName+')':'') : row.itemName||'';
+      const amt = (row.qty||0) * (row.price||0);
+      [itemLabel, row.qty||0, row.unit||'pcs', row.price||0, amt].forEach((v,i) => {
+        const c = ivSheet.getCell(curRow, i+1);
+        c.value = v;
+        c.font = { name:'Arial', size:9 };
+        if(i===1||i===3||i===4) {
+          c.alignment = { horizontal:'right', vertical:'middle' };
+          if(i===3) c.numFmt = '#,##0.00000';
+          if(i===4) c.numFmt = '#,##0.000';
+        }
+        c.border = thinBorder;
+      });
+      ivSheet.getRow(curRow).height = 14;
+      curRow++;
+    });
+
+    // Divider
+    mergeHdr(ivSheet, curRow, 1, curRow, 5, '/'.repeat(80), {sz:7});
+    curRow++;
+
+    // Total row
+    const totQty = _ivRows.reduce((s,r)=>s+(r.qty||0),0);
+    const totAmt = _ivRows.reduce((s,r)=>s+(r.qty||0)*(r.price||0),0);
+    ['TOTAL', totQty, 'pcs', '', totAmt].forEach((v,i) => {
+      const c = ivSheet.getCell(curRow, i+1);
+      c.value = v;
+      c.font = { name:'Arial', size:9, bold:true };
+      if(i===1||i===4) {
+        c.alignment = { horizontal:'right', vertical:'middle' };
+        if(i===4) c.numFmt = '#,##0.000';
+      }
+      c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFFFF2CC'} };
+      c.border = thinBorder;
+    });
+    ivSheet.getRow(curRow).height = 15;
+    curRow += 2;
+
+    // Maker / Origin info (unique by category)
+    const makerMap = {};
+    _ivRows.forEach(r => {
+      if(r.cat && !makerMap[r.cat]) makerMap[r.cat] = { maker:r.maker, origin:r.origin };
+    });
+    Object.entries(makerMap).forEach(([cat, info]) => {
+      hdr(ivSheet, curRow, 4, cat, {bold:true});
+      hdr(ivSheet, curRow, 5, 'Maker : '+(info.maker||'')+'\nOrigin : Made in '+(info.origin||''), {wrap:true});
+      ivSheet.getRow(curRow).height = 24;
+      curRow++;
+    });
+
+    curRow += 2;
+    hdr(ivSheet, curRow, 2, 'SIGNED BY', {h:'center', bold:true});
+    hdr(ivSheet, curRow+1, 4, 'UNISOLEC CO., LTD', {h:'center', bold:true});
+
+    // ══════════════════════════════════════════════
+    // Sheet 2: Packing List
+    // ══════════════════════════════════════════════
+    const plSheet = wb.addWorksheet('PL');
+    plSheet.columns = [
+      { width:36 }, // A
+      { width:12 }, // B qty
+      { width:5  }, // C unit
+      { width:14 }, // D pallet
+      { width:12 }, // E net wt
+      { width:12 }, // F gross wt
+    ];
+
+    // Title
+    mergeHdr(plSheet,1,1,1,6,'PACKING LIST',{sz:14,bold:true,h:'center',fill:'FFCFE2F3'});
+    plSheet.getRow(1).height = 22;
+
+    // Header block (same as IV)
+    hdr(plSheet,2,1,'1) Shipper/Exporter',{bold:true});
+    hdr(plSheet,2,4,'8) No. & date of invoice',{bold:true});
+    hdr(plSheet,3,1,'   UNISOLEC CO., LTD',{bold:true});
+    hdr(plSheet,3,4,'    '+ivNo);
+    hdr(plSheet,3,5,fmtDate);
+    hdr(plSheet,4,1,'   #809, Nex Zone, SK Technopark, Wanamro 50, Seongsan-gu');
+    hdr(plSheet,4,4,'9) No. & date of L/C',{bold:true});
+    hdr(plSheet,5,1,'   Changwon-si, Korea');
+    hdr(plSheet,5,4,'    N/A');
+    if(shipAttn) hdr(plSheet,6,1,'   Attn : '+shipAttn);
+    hdr(plSheet,7,1,'2) For account & Risk of messrs',{bold:true});
+    hdr(plSheet,7,4,'10) L/C issuing bank',{bold:true});
+    hdr(plSheet,8,1,'    '+consName);
+    hdr(plSheet,8,4,'     N/A');
+    if(consAddr) {
+      const addrLines = consAddr.split(',');
+      hdr(plSheet,9,1,'    '+addrLines.slice(0,-1).join(',').trim());
+      if(addrLines.length>1) hdr(plSheet,10,1,'    '+addrLines[addrLines.length-1].trim());
+    }
+    if(consAttn) hdr(plSheet,11,1,'    Attn : '+consAttn);
+    hdr(plSheet,12,1,'3) Notify party',{bold:true});
+    hdr(plSheet,12,4,'11) Remarks',{bold:true});
+    hdr(plSheet,13,1,'   Same as above');
+
+    // Shipping mark box
+    hdr(plSheet,14,4,'Shipping Mark',{bold:true});
+    hdr(plSheet,15,1,'4) Port of loading',{bold:true}); hdr(plSheet,15,2,'5) Final destination',{bold:true});
+    hdr(plSheet,15,4,'Supplier'); hdr(plSheet,15,5,'UNISOLEC CO.,LTD',{bold:true});
+    hdr(plSheet,16,1,'    '+pol); hdr(plSheet,16,2,'     '+pod);
+    hdr(plSheet,16,4,'Loading Place'); hdr(plSheet,16,5,pol);
+    hdr(plSheet,17,1,'6) Carrier',{bold:true}); hdr(plSheet,17,2,'7) Sailing on/or about',{bold:true});
+    hdr(plSheet,17,4,'Consignee'); hdr(plSheet,17,5,consName,{bold:true});
+    hdr(plSheet,18,1,'    '+carrier); hdr(plSheet,18,2,'      '+sailing);
+
+    const plMarksRow = 20;
+    mergeHdr(plSheet, plMarksRow, 1, plMarksRow, 6, '12) Marks & Nos.', {bold:true});
+    plSheet.getRow(plMarksRow).height = 10;
+
+    const plColHdrRow = plMarksRow + 2;
+    ['13) Desc. Of goods', '14) Quantity', '', '15) Pallet NO.', '16) Net weight', '17) Gross weight'].forEach((v,i) => {
+      const c = plSheet.getCell(plColHdrRow, i+1);
+      c.value = v;
+      c.font = { name:'Arial', size:9, bold:true };
+      c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFCFE2F3'} };
+      c.alignment = { vertical:'middle', horizontal: i===0?'left':'center' };
+      c.border = thinBorder;
+    });
+    plSheet.getRow(plColHdrRow).height = 18;
+
+    // PL Items
+    let plRow = plColHdrRow + 1;
+    let plLastCat = null;
+    _ivRows.forEach(row => {
+      if(row.cat !== plLastCat) {
+        mergeHdr(plSheet, plRow, 1, plRow, 6, row.cat, {bold:true, sz:9});
+        plSheet.getRow(plRow).height = 15;
+        plRow++;
+        plLastCat = row.cat;
+      }
+      const itemLabel = row.itemCode ? row.itemCode+(row.itemName?' ('+row.itemName+')':'') : row.itemName||'';
+      const palletStr = row.palletNo ? row.palletNo+(row.ctCount?' ('+row.ctCount+' C/T)':'') : '';
+      [itemLabel, row.qty||0, row.unit||'pcs', palletStr, row.netWt||0, row.grossWt||0].forEach((v,i) => {
+        const c = plSheet.getCell(plRow, i+1);
+        c.value = v;
+        c.font = { name:'Arial', size:9 };
+        if(i===1||i===4||i===5) {
+          c.alignment = { horizontal:'right', vertical:'middle' };
+          if(i===4||i===5) c.numFmt = '#,##0.000';
+        }
+        c.border = thinBorder;
+      });
+      plSheet.getRow(plRow).height = 14;
+      plRow++;
+    });
+
+    // Divider + Total
+    mergeHdr(plSheet, plRow, 1, plRow, 6, '/'.repeat(80), {sz:7});
+    plRow++;
+
+    const plTotQty   = _ivRows.reduce((s,r)=>s+(r.qty||0),0);
+    const plTotNet   = _ivRows.reduce((s,r)=>s+(r.netWt||0),0);
+    const plTotGross = _ivRows.reduce((s,r)=>s+(r.grossWt||0),0);
+    const plTotCt    = _ivRows.reduce((s,r)=>s+(r.ctCount||0),0);
+    ['TOTAL', plTotQty, 'pcs', plTotCt+'PLTs', plTotNet, plTotGross].forEach((v,i) => {
+      const c = plSheet.getCell(plRow, i+1);
+      c.value = v;
+      c.font = { name:'Arial', size:9, bold:true };
+      if(i===1||i===4||i===5) {
+        c.alignment = { horizontal:'right', vertical:'middle' };
+        if(i===4||i===5) c.numFmt = '#,##0.000';
+      }
+      c.fill = { type:'pattern', pattern:'solid', fgColor:{argb:'FFCFE2F3'} };
+      c.border = thinBorder;
+    });
+    plSheet.getRow(plRow).height = 15;
+    plRow += 3;
+    hdr(plSheet, plRow, 3, 'SIGNED BY', {h:'center',bold:true});
+    hdr(plSheet, plRow, 4, 'UNISOLEC CO.,LTD', {h:'center',bold:true});
+
+    // ── 다운로드 ──
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const fileName = ivNo.replace(/[\/\\:*?"<>|]/g,'-') + '_IV_PL.xlsx';
+    a.href = url; a.download = fileName; a.click();
+    URL.revokeObjectURL(url);
+    showToast('✓ '+fileName+' 다운로드 완료');
+  } catch(e) {
+    console.error(e);
+    showToast('⚠ Excel 생성 오류: '+e.message);
+  }
+}
+
 </script>
 
 </div><!-- /app-screen -->
