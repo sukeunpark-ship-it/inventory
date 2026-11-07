@@ -102,6 +102,8 @@
     if(histPreviewBtn) histPreviewBtn.style.display = isSuperAdmin ? '' : 'none';
     const histFixBtn = document.getElementById('hist-fix-partner-btn');
     if(histFixBtn) histFixBtn.style.display = isSuperAdmin ? '' : 'none';
+    const histMatchBtn = document.getElementById('hist-match-partner-btn');
+    if(histMatchBtn) histMatchBtn.style.display = isSuperAdmin ? '' : 'none';
     // 품목 엑셀 일괄 등록 버튼: 최고 관리자만 표시
     const itemsExcelTplBtn = document.getElementById('items-excel-template-btn');
     if(itemsExcelTplBtn) itemsExcelTplBtn.style.display = isSuperAdmin ? '' : 'none';
@@ -628,6 +630,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
   .pt-seg button { border:none; background:var(--surface); color:var(--text2); padding:5px 12px; font-size:12px; cursor:pointer; font-family:'Noto Sans KR',sans-serif; }
   .pt-seg button + button { border-left:1px solid var(--border2); }
   .pt-seg button.on { background:var(--blue); color:#fff; font-weight:600; }
+  .fin-mode-seg button { padding:2px 8px; font-size:11px; }
   .pt-wrap { overflow:auto; max-height:70vh; border-top:1px solid var(--border); }
   .pt-table { width:100%; border-collapse:collapse; font-size:12px; }
   .pt-table th { position:sticky; top:0; z-index:2; background:var(--surface2); color:var(--text2); font-weight:600; text-align:left; padding:8px 10px; border-bottom:1px solid var(--border2); white-space:nowrap; }
@@ -1052,13 +1055,14 @@ textarea.form-control{min-height:64px;resize:vertical;}
           <button class="btn btn-secondary btn-sm" onclick="setDateRange('week')">이번 주</button>
           <button class="btn btn-secondary btn-sm" onclick="setDateRange('clear')">초기화</button>
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-          <div style="display:flex;align-items:center;gap:8px;">
+        <div style="display:flex;justify-content:flex-start;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:8px 20px;">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
             <div style="font-size:11px;color:var(--text3);">⚠ 수정/삭제 시 재고가 자동으로 재계산됩니다.</div>
             <button id="hist-fix-preview-btn" onclick="previewFixHistoryPartners()" class="btn btn-info btn-sm" style="display:none;font-size:11px;">📋 변경 목록 엑셀</button>
             <button id="hist-fix-partner-btn" onclick="bulkFixHistoryPartners()" class="btn btn-warning btn-sm" style="display:none;font-size:11px;">🔄 거래처명 일괄 정리</button>
+            <button id="hist-match-partner-btn" onclick="openPartnerMatchModal()" class="btn btn-primary btn-sm" style="display:none;font-size:11px;" title="지금 조회 조건에 걸린 이력의 거래처명을 거래처 관리에 등록된 이름으로 맞춥니다">🏢 거래처명 맞추기 (현재 조회분)</button>
           </div>
-          <div id="hist-summary" style="display:flex;gap:14px;font-size:12px;color:var(--text2);"></div>
+          <div id="hist-summary" style="display:flex;gap:6px 14px;flex-wrap:wrap;justify-content:flex-start;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:5px 12px;font-size:12px;color:var(--text2);"></div>
         </div>
         <div class="card card-table"><table><thead><tr>
           <th class="th-sort" onclick="toggleSort('hist','date',renderHistory)">일자<span class="sort-arrow" id="sort-hist-date"></span></th>
@@ -1180,6 +1184,20 @@ textarea.form-control{min-height:64px;resize:vertical;}
           <div class="card-body">
             <div class="chart-wrap" style="height:220px;"><canvas id="chart-monthly-out" role="img" aria-label="월별 출고 수량 및 금액 추이"></canvas></div>
             <div class="legend" id="legend-monthly-out"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">월별 입고 변동 추이</div>
+            <select class="form-control" style="width:130px;font-size:12px;" id="chart-month-range-in" onchange="renderMonthlyInChart()">
+              <option value="6">최근 6개월</option>
+              <option value="12" selected>최근 12개월</option>
+              <option value="24">최근 24개월</option>
+            </select>
+          </div>
+          <div class="card-body">
+            <div class="chart-wrap" style="height:220px;"><canvas id="chart-monthly-in" role="img" aria-label="월별 입고 수량 추이"></canvas></div>
+            <div class="legend" id="legend-monthly-in"></div>
           </div>
         </div>
         <div class="card">
@@ -1344,16 +1362,40 @@ textarea.form-control{min-height:64px;resize:vertical;}
 
       <div class="tab-content" id="tab-finance">
         <div class="metrics" style="grid-template-columns:repeat(3,1fr);">
-          <div class="metric-card"><div class="metric-label">이번 달 매출</div><div class="metric-value green" id="f-sales">—</div><div class="metric-sub">출고 금액 합계</div></div>
-          <div class="metric-card"><div class="metric-label">이번 달 매입</div><div class="metric-value red" id="f-purchase">—</div><div class="metric-sub">입고 금액 합계</div></div>
-          <div class="metric-card"><div class="metric-label">이번 달 이익</div><div class="metric-value" id="f-profit-month" style="color:var(--blue)">—</div><div class="metric-sub">매출 - 매출원가</div></div>
+          <div class="metric-card"><div class="metric-label">이번 달 매출</div><div class="metric-value green" id="f-sales">—</div><div class="metric-sub"><span class="f-month-range"></span>출고 금액 합계</div></div>
+          <div class="metric-card"><div class="metric-label">이번 달 매입</div><div class="metric-value red" id="f-purchase">—</div><div class="metric-sub"><span class="f-month-range"></span>입고 금액 합계</div></div>
+          <div class="metric-card" style="position:relative;">
+            <div class="metric-label">
+              <span id="f-profit-label">이번 달 매출 - 매입</span>
+              <span class="pt-seg fin-mode-seg" style="position:absolute;top:12px;right:12px;">
+                <button type="button" data-m="diff" onclick="setFinProfitMode('diff')" title="매출 합계 - 매입 합계">매출-매입</button>
+                <button type="button" data-m="cogs" onclick="setFinProfitMode('cogs')" title="Σ (판매단가 - 입고단가) × 출고수량">이익</button>
+              </span>
+            </div>
+            <div class="metric-value" id="f-profit-month" style="color:var(--blue)">—</div>
+            <div class="metric-sub"><span class="f-month-range"></span><span id="f-profit-sub">매출 합계 - 매입 합계</span></div>
+          </div>
         </div>
         <div class="searchbar">
           <input class="form-control" type="text" placeholder="품목명·코드·거래처 검색..." id="fin-search" oninput="renderFinance()">
           <select class="form-control" id="fin-type" onchange="renderFinance()" style="width:130px;"><option value="">전체</option><option value="매출">매출(출고)</option><option value="매입">매입(입고)</option></select>
-          <select class="form-control" id="fin-period" onchange="renderFinance()" style="width:130px;"><option value="30">최근 30일</option><option value="90">최근 3개월</option><option value="all">전체</option></select>
+          <select class="form-control" id="fin-period" onchange="onFinPeriodChange()" style="width:130px;">
+            <option value="thismonth">이번 달</option>
+            <option value="lastmonth">지난 달</option>
+            <option value="30" selected>최근 30일</option>
+            <option value="90">최근 3개월</option>
+            <option value="thisyear">올해</option>
+            <option value="all">전체</option>
+            <option value="custom">기간 지정</option>
+          </select>
+          <span id="fin-date-box" style="display:none;align-items:center;gap:6px;">
+            <input class="form-control" type="date" id="fin-date-from" onchange="renderFinance()" style="width:150px;">
+            <span style="color:var(--text3);">~</span>
+            <input class="form-control" type="date" id="fin-date-to" onchange="renderFinance()" style="width:150px;">
+          </span>
           <button class="btn btn-info" onclick="exportFinanceCSV()">⬇ CSV</button>
         </div>
+        <div id="fin-period-summary" style="font-size:12px;color:var(--text2);margin:-4px 0 10px 2px;"></div>
         <div class="card card-table">
           <table><thead><tr><th>일자</th><th>구분</th><th>품목명</th><th>수량</th><th>단가</th><th>금액</th><th>거래처</th><th>결제</th><th>비고</th></tr></thead>
           <tbody id="fin-body"></tbody></table>
@@ -1760,7 +1802,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
 
 <!-- 엑셀 입출고 등록 모달 -->
 <div class="modal-bg" id="import-modal">
-  <div class="modal" style="width:680px;">
+  <div class="modal" style="width:880px;max-width:96vw;">
     <div class="modal-title">📥 대량 업로드</div>
     <div style="background:var(--blue-bg);border:1px solid #85B7EB;border-radius:var(--r);padding:10px 14px;margin-bottom:14px;font-size:12px;color:var(--blue);line-height:1.7;">
       수급계획 엑셀(입출고 시트)의 입고·출하 수량을 읽어 ERP에 등록합니다.<br>
@@ -1771,6 +1813,15 @@ textarea.form-control{min-height:64px;resize:vertical;}
       <div class="form-group"><label class="form-label">시트</label><select class="form-control" id="imp-sheet" onchange="parseImportSheet()"></select></div>
     </div>
     <div id="imp-summary" style="display:none;font-size:12px;color:var(--text2);margin-bottom:8px;"></div>
+    <!-- 거래처명 확인: 거래처 관리에 없는 이름 → 자동 변경 또는 선택 -->
+    <div id="imp-partner-wrap" style="display:none;margin-bottom:12px;border:1px solid #F0C36D;background:#FFF8E6;border-radius:var(--r);padding:10px 12px;">
+      <div style="font-size:12px;font-weight:600;color:#8A5A00;margin-bottom:6px;" id="imp-partner-title">🏢 거래처명 확인</div>
+      <div style="max-height:200px;overflow:auto;background:var(--surface);border:1px solid var(--border);border-radius:var(--r);">
+        <table class="pt-table"><thead><tr><th>엑셀의 거래처명</th><th class="num">건수</th><th>→ 등록할 거래처</th><th>상태</th></tr></thead>
+        <tbody id="imp-partner-body"></tbody></table>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:6px;">확실히 같은 회사는 자동으로 바꿨고, 애매한 이름은 직접 골라야 등록할 수 있습니다. 고른 내용은 기억해서 다음 업로드 때 자동으로 바꿉니다.</div>
+    </div>
     <div id="imp-preview" style="display:none;max-height:280px;overflow-y:auto;margin-bottom:14px;">
       <div class="card card-table" style="margin:0;">
         <table><thead><tr><th>날짜</th><th>유형</th><th>품목코드</th><th>품목명</th><th>거래처</th><th>수량</th><th>단가</th><th>상태</th></tr></thead>
@@ -3944,12 +3995,25 @@ function renderHistory() {
   // 조회 결과 요약 표시
   const summaryEl = document.getElementById('hist-summary');
   if(summaryEl) {
-    const inCnt  = f.filter(h=>h.type==='in').length;
-    const outCnt = f.filter(h=>h.type==='out').length;
+    // 유형별 건수·수량·금액 (USD 금액은 전월말 환율로 원화 환산)
+    const sumOf = t => {
+      const rows = f.filter(h=>h.type===t);
+      return {
+        cnt: rows.length,
+        qty: rows.reduce((a,h)=>a+(Number(h.qty)||0),0),
+        amt: rows.reduce((a,h)=>a+toKrw(h),0),
+        usd: rows.some(h=>getCurrency(h)==='USD')
+      };
+    };
+    const si = sumOf('in'), so = sumOf('out');
+    const usdNote = (si.usd||so.usd) ? ' title="USD 금액은 전월말 환율로 원화 환산한 값입니다"' : '';
+    const part = (label, s, color) => s.cnt===0 ? '' :
+      `<span style="color:${color}"${usdNote}><strong>${label} ${s.cnt.toLocaleString()}건</strong> · 수량 <strong>${s.qty.toLocaleString()}</strong> · 금액 <strong>${won(Math.round(s.amt))}</strong>${(label==='입고'?si.usd:so.usd)?' <span style="font-size:10px;color:var(--text3)">(USD 환산)</span>':''}</span>`;
+    summaryEl.style.display = f.length===0 ? 'none' : 'flex';
     summaryEl.innerHTML = f.length===0 ? '' :
-      `<span>총 <strong>${f.length}건</strong></span>
-       <span style="color:var(--green)">입고 ${inCnt}건</span>
-       <span style="color:var(--red)">출고 ${outCnt}건</span>`;
+      `<span>총 <strong>${f.length.toLocaleString()}건</strong></span>
+       ${part('입고', si, 'var(--green)')}
+       ${part('출고', so, 'var(--red)')}`;
   }
 
   document.getElementById('hist-body').innerHTML = f.length === 0
@@ -4341,6 +4405,206 @@ async function previewFixHistoryPartners() {
   const dateStr = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
   XLSX.writeFile(wb, `거래처명_변경목록_${dateStr}.xlsx`);
   showToast(`✓ 총 ${rows.length}건 변경 목록 엑셀 다운로드 완료`);
+}
+
+/* ── 거래처명 맞추기 (이력 조회 현재 조건 기준) ──────────────────────────────
+   조회 조건(기간·Maker·품목코드·유형·검색·거래처)에 걸린 이력의 거래처명을
+   거래처 관리에 등록된 이름으로 바꿈. 이력 + 연결된 매출·매입 장부 + 미수금까지 함께 변경. */
+function getHistoryFilteredByView() {
+  const val = id => (document.getElementById(id)||{}).value || '';
+  const q = val('hist-search').toLowerCase(), type = val('hist-type'), period = val('hist-period') || 'all';
+  const partner = val('hist-partner'), itemCode = val('hist-item-code'), maker = val('hist-maker');
+  const dateFrom = period==='custom' ? val('hist-date-from') : '';
+  const dateTo   = period==='custom' ? val('hist-date-to')   : '';
+  const now = new Date();
+  return getHistory().filter(h => {
+    if(q) {
+      const it = getItem(h.itemName);
+      const codeMatch = it && it.code.toLowerCase().includes(q);
+      if(!(h.itemName||'').toLowerCase().includes(q) && !codeMatch) return false;
+    }
+    if(type && h.type !== type) return false;
+    if(partner && (h.partner||'') !== partner) return false;
+    if(itemCode) { const item=getItem(h.itemName); if(!item||item.code!==itemCode) return false; }
+    if(maker) { const item=getItem(h.itemName); if(!item||(item.maker||'').trim()!==maker) return false; }
+    if(period === 'custom') {
+      if(dateFrom && h.date < dateFrom) return false;
+      if(dateTo   && h.date > dateTo)   return false;
+    } else if(period === 'today') {
+      if(h.date !== TODAY) return false;
+    } else if(period !== 'all') {
+      if((now - new Date(h.date)) / 864e5 > parseInt(period)) return false;
+    }
+    return true;
+  });
+}
+function _pmNorm(s) {
+  return String(s||'').toLowerCase()
+    .replace(/\(주\)|㈜|주식회사|유한회사|\(유\)|co\.?,?\s*ltd\.?|inc\.?|corp\.?/g, '')
+    .replace(/[\s()\[\]{}.,·\-_/]/g, '');
+}
+function _pmDice(a, b) {
+  if(!a || !b) return 0;
+  if(a === b) return 1;
+  const grams = s => { const m = new Map(); for(let i=0;i<s.length-1;i++){ const g=s.slice(i,i+2); m.set(g,(m.get(g)||0)+1); } return m; };
+  const A = grams(a), B = grams(b); let inter = 0;
+  A.forEach((n,g)=>{ inter += Math.min(n, B.get(g)||0); });
+  const tot = Math.max(1, a.length-1) + Math.max(1, b.length-1);
+  return 2*inter / tot;
+}
+/* 등록 거래처 후보 점수 순 정렬 + 추천(확실할 때만) */
+function _pmCandidates(oldName, customers) {
+  const on = _pmNorm(oldName);
+  const scored = customers.map(c => {
+    const cn = _pmNorm(c.name);
+    let score = _pmDice(on, cn), why = '유사';
+    if(cn && cn === on) { score = 2; why = '일치'; }
+    else if(cn && on && (cn.includes(on) || on.includes(cn))) { score = Math.max(score, 1.2); why = '포함'; }
+    return { name: c.name, score, why };
+  }).sort((a,b)=> b.score - a.score || a.name.localeCompare(b.name,'ko'));
+  let pick = null;
+  const top = scored[0], second = scored[1];
+  if(top) {
+    if(top.why === '일치' && !(second && second.why === '일치')) pick = top;
+    else if(top.why === '포함' && !(second && second.score >= 1.2)) pick = top;
+    else if(top.why === '유사' && top.score >= 0.6 && !(second && second.score >= top.score - 0.1)) pick = top;
+  }
+  return { list: scored, pick };
+}
+function openPartnerMatchModal() {
+  const currentEmail = window._auth && window._auth.currentUser && window._auth.currentUser.email;
+  if(currentEmail !== 'sk.park@unisolec.com') { showToast('⚠ 관리자만 사용 가능합니다.'); return; }
+  const customers = getCustomers();
+  if(customers.length === 0) { showToast('⚠ 거래처 관리에 등록된 거래처가 없습니다.'); return; }
+  let modal = document.getElementById('partner-match-modal');
+  if(!modal) {
+    modal = document.createElement('div');
+    modal.className = 'modal-bg'; modal.id = 'partner-match-modal';
+    modal.innerHTML = `<div class="modal" style="width:860px;max-width:96vw;">
+      <div class="modal-title">🏢 거래처명 맞추기</div>
+      <div id="pm-info" style="font-size:12px;color:var(--text2);margin:-8px 0 10px;line-height:1.6;"></div>
+      <label style="font-size:12px;color:var(--text2);display:inline-flex;align-items:center;gap:6px;margin-bottom:8px;cursor:pointer;">
+        <input type="checkbox" id="pm-show-registered" onchange="renderPartnerMatchRows()"> 이미 등록된 거래처명도 표시 (다른 등록 이름으로 바꾸고 싶을 때)
+      </label>
+      <div style="max-height:52vh;overflow:auto;border:1px solid var(--border);border-radius:var(--r);">
+        <table class="pt-table"><thead><tr>
+          <th>현재 거래처명</th><th class="num">입고</th><th class="num">출고</th><th>→ 변경할 등록 거래처</th><th>근거</th>
+        </tr></thead><tbody id="pm-body"></tbody></table>
+      </div>
+      <div style="font-size:11px;color:var(--text3);margin-top:8px;line-height:1.6;">
+        · 추천은 (주)·㈜·주식회사·공백을 빼고 같거나 포함되는 이름, 또는 아주 비슷한 이름일 때만 자동으로 골라집니다. 나머지는 직접 고르세요.<br>
+        · 적용하면 해당 이력과, 그 이력에 연결된 매출·매입 장부·미수금의 거래처명이 함께 바뀝니다. 수량·단가·재고는 바뀌지 않습니다.
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="document.getElementById('partner-match-modal').classList.remove('open')">취소</button>
+        <button class="btn btn-primary" id="pm-apply-btn" onclick="applyPartnerMatch()">적용</button>
+      </div>
+    </div>`;
+    document.body.appendChild(modal);
+  }
+  window._pmScope = getHistoryFilteredByView();
+  renderPartnerMatchRows();
+  modal.classList.add('open');
+}
+function renderPartnerMatchRows() {
+  const customers = getCustomers();
+  const regSet = new Set(customers.map(c=>c.name));
+  const scope = window._pmScope || [];
+  const showReg = (document.getElementById('pm-show-registered')||{}).checked;
+  const agg = new Map();
+  scope.forEach(h => {
+    const p = h.partner || '';
+    if(!p) return;
+    const a = agg.get(p) || {in:0, out:0};
+    h.type === 'in' ? a.in++ : a.out++;
+    agg.set(p, a);
+  });
+  const names = [...agg.keys()].filter(n => showReg || !regSet.has(n)).sort((a,b)=>a.localeCompare(b,'ko'));
+  const unreg = [...agg.keys()].filter(n => !regSet.has(n)).length;
+  const blank = scope.filter(h=>!h.partner).length;
+  document.getElementById('pm-info').innerHTML =
+    `현재 이력 조회 조건에 걸린 <b>${scope.length.toLocaleString()}건</b> 기준 · 거래처명 ${agg.size}개 중 <b style="color:var(--red)">거래처 관리에 없는 이름 ${unreg}개</b>` +
+    (blank ? ` · 거래처가 비어 있는 이력 ${blank}건(대상 아님)` : '');
+  const esc = _ptEsc;
+  const body = document.getElementById('pm-body');
+  if(names.length === 0) {
+    body.innerHTML = `<tr><td colspan="5" class="empty-p" style="padding:18px;">${scope.length? '모든 거래처명이 등록된 이름과 일치합니다 ✓' : '조회된 이력이 없습니다. 이력 조회에서 기간·Maker 등을 먼저 고르세요.'}</td></tr>`;
+    updatePartnerMatchCount(); return;
+  }
+  body.innerHTML = names.map((n, idx) => {
+    const a = agg.get(n);
+    const { list, pick } = _pmCandidates(n, customers.filter(c=>c.name!==n));
+    const top = list.slice(0, 5);
+    const rest = list.slice(5).sort((x,y)=>x.name.localeCompare(y.name,'ko'));
+    const opt = (c, sel) => `<option value="${esc(c.name)}"${sel?' selected':''}>${esc(c.name)}</option>`;
+    const why = pick ? `<span class="badge ${pick.why==='일치'?'badge-green':pick.why==='포함'?'badge-blue':'badge-amber'}">${pick.why}</span>` : '<span style="color:var(--text3)">직접 선택</span>';
+    return `<tr${regSet.has(n)?' style="opacity:.75"':''}>
+      <td style="font-weight:600">${esc(n)}${regSet.has(n)?' <span style="font-size:10px;color:var(--text3)">(등록됨)</span>':''}</td>
+      <td class="num">${a.in||'—'}</td><td class="num">${a.out||'—'}</td>
+      <td><select class="form-control pm-sel" data-old="${esc(n)}" onchange="updatePartnerMatchCount()" style="font-size:12px;padding:5px 8px;min-width:260px;">
+        <option value="">— 변경 안 함 —</option>
+        <optgroup label="비슷한 이름">${top.map(c=>opt(c, pick && c.name===pick.name)).join('')}</optgroup>
+        <optgroup label="전체 등록 거래처">${rest.map(c=>opt(c,false)).join('')}</optgroup>
+      </select></td>
+      <td>${why}</td>
+    </tr>`;
+  }).join('');
+  updatePartnerMatchCount();
+}
+function _pmMapping() {
+  const m = {};
+  document.querySelectorAll('#pm-body .pm-sel').forEach(s => { if(s.value && s.value !== s.dataset.old) m[s.dataset.old] = s.value; });
+  return m;
+}
+function updatePartnerMatchCount() {
+  const m = _pmMapping();
+  const n = (window._pmScope||[]).filter(h => m[h.partner]).length;
+  const btn = document.getElementById('pm-apply-btn');
+  if(btn) { btn.textContent = n ? `적용 (이력 ${n}건 변경)` : '적용'; btn.disabled = !n; }
+}
+async function applyPartnerMatch() {
+  const m = _pmMapping();
+  const targets = (window._pmScope||[]).filter(h => m[h.partner]);
+  if(!targets.length) return;
+  const preview = Object.entries(m).map(([o,n])=>{
+    const c = targets.filter(h=>h.partner===o).length;
+    return `• "${o}" → "${n}"  (${c}건)`;
+  }).join('\n');
+  if(!confirm(`다음과 같이 거래처명을 바꿉니다:\n\n${preview}\n\n이력 ${targets.length}건과 연결된 매출·매입 장부·미수금도 함께 바뀝니다. 계속할까요?`)) return;
+  const btn = document.getElementById('pm-apply-btn');
+  if(btn) { btn.disabled = true; btn.textContent = '변경 중...'; }
+  const fin = getFinance(), rec = getReceivable();
+  const usedFin = new Set();
+  let nh = 0, nf = 0, nr = 0, failed = 0;
+  for(const h of targets) {
+    const oldName = h.partner, newName = m[oldName];
+    try {
+      await window._db_updateHistory(h._id, { partner: newName });
+      nh++;
+      // 연결된 장부: historyId로 찾고, 없으면 같은 날짜·품목·수량·유형·거래처로 1건 매칭
+      const ftype = h.type === 'in' ? '매입' : '매출';
+      let links = fin.filter(f => f.historyId && f.historyId === h._id);
+      if(!links.length) {
+        const f = fin.find(f => !usedFin.has(f._id) && !f.historyId && f.partner === oldName && f.date === h.date && f.itemName === h.itemName && f.type === ftype && (f.qty||0) === (h.qty||0));
+        if(f) links = [f];
+      }
+      for(const f of links) {
+        if(usedFin.has(f._id) || f.partner === newName) continue;
+        usedFin.add(f._id);
+        await window._db_updateFinance(f._id, { partner: newName }); nf++;
+      }
+      // 미수금 (출고 외상): 같은 날짜·품목·금액·거래처
+      if(h.type === 'out') {
+        for(const r of rec.filter(r => r.partner === oldName && r.date === h.date && r.itemName === h.itemName && (r.amount||0) === (h.amount||0))) {
+          await window._db_updateReceivable(r._id, { partner: newName }); nr++;
+        }
+      }
+    } catch(e) { failed++; console.warn('[거래처명 맞추기] 실패:', h._id, e); }
+  }
+  if(btn) { btn.disabled = false; }
+  document.getElementById('partner-match-modal').classList.remove('open');
+  showToast(`✓ 거래처명 변경 완료: 이력 ${nh}건 · 장부 ${nf}건 · 미수금 ${nr}건${failed?` · 실패 ${failed}건`:''}`);
+  renderHistory();
 }
 
 async function bulkFixHistoryPartners() {
@@ -5263,6 +5527,7 @@ function renderCharts() {
 
   // 월별 출고 추이
   renderMonthlyOutChart();
+  renderMonthlyInChart();
   renderItemMonthlyChart();
   renderPartnerYoYChart();
 }
@@ -5314,6 +5579,47 @@ function renderMonthlyOutChart() {
   // MoM 배지 범례
   const avgMom = mom.length>0?Math.round(mom.reduce((a,b)=>a+b,0)/mom.length):0;
   document.getElementById('legend-monthly-out').innerHTML=
+    `<div class="legend-item"><div class="legend-dot" style="background:#E24B4A"></div>전월 대비 증가</div>`+
+    `<div class="legend-item"><div class="legend-dot" style="background:#639922"></div>전월 대비 감소</div>`+
+    `<span style="margin-left:auto;font-size:11px;color:var(--text2)">평균 전월대비 <strong style="color:${avgMom>=0?'var(--red)':'var(--green)'}">${avgMom>=0?'+':''}${avgMom}%</strong></span>`;
+}
+
+/* 월별 입고 추이 (출고 추이와 같은 형식) */
+let chartMonthlyIn=null;
+function renderMonthlyInChart() {
+  if(chartMonthlyIn){chartMonthlyIn.destroy();chartMonthlyIn=null;}
+  const canvas=document.getElementById('chart-monthly-in');
+  if(!canvas) return;
+  const hist=getChartHistory();
+  const n=parseInt((document.getElementById('chart-month-range-in')||{}).value||12);
+  const months=getMonths(n);
+  const inQty=months.map(m=>hist.filter(h=>h.date?.startsWith(m)&&h.type==='in').reduce((a,b)=>a+(b.qty||0),0));
+  const mom=inQty.slice(1).map((v,i)=>inQty[i]>0?Math.round((v-inQty[i])/inQty[i]*100):0);
+
+  chartMonthlyIn=new Chart(canvas,{
+    type:'bar',
+    data:{
+      labels:months.map(m=>m.slice(5)+'월'),
+      datasets:[{label:'입고 수량',data:inQty,backgroundColor:inQty.map((_,i)=>{
+        if(i===0) return 'rgba(55,138,221,0.5)';
+        return inQty[i]>inQty[i-1]?'rgba(226,75,74,0.65)':'rgba(99,153,34,0.65)';
+      }),borderWidth:0,borderRadius:4,maxBarThickness:34}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{
+        afterLabel:(ctx)=>{
+          if(ctx.dataIndex>0){ const r=mom[ctx.dataIndex-1]; return `전월 대비: ${r>=0?'+':''}${r}%`; }
+          return '';
+        }
+      }}},
+      scales:{
+        x:{ticks:{font:{size:11}}},
+        y:{beginAtZero:true,ticks:{font:{size:10}},title:{display:true,text:'수량',font:{size:10}}}
+      }
+    }
+  });
+  const avgMom=mom.length>0?Math.round(mom.reduce((a,b)=>a+b,0)/mom.length):0;
+  document.getElementById('legend-monthly-in').innerHTML=
     `<div class="legend-item"><div class="legend-dot" style="background:#E24B4A"></div>전월 대비 증가</div>`+
     `<div class="legend-item"><div class="legend-dot" style="background:#639922"></div>전월 대비 감소</div>`+
     `<span style="margin-left:auto;font-size:11px;color:var(--text2)">평균 전월대비 <strong style="color:${avgMom>=0?'var(--red)':'var(--green)'}">${avgMom>=0?'+':''}${avgMom}%</strong></span>`;
@@ -5564,7 +5870,8 @@ function getCurrency(f) {
 }
 /* 거래일 기준 전월말 YYYY-MM 반환 */
 function getPrevMonthYm(dateStr) {
-  const dt = new Date((dateStr||TODAY)+'-01');
+  // 'YYYY-MM' 과 'YYYY-MM-DD' 둘 다 받음 (예전엔 'YYYY-MM-DD'가 들어오면 'NaN-NaN'이 되어 USD 환산이 안 됐음)
+  const dt = new Date(String(dateStr||TODAY).slice(0,7)+'-01');
   dt.setMonth(dt.getMonth()-1);
   return `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;
 }
@@ -5586,25 +5893,137 @@ function getFxInfo(f) {
   return { yyyymm: prevYm, dateLabel, rate };
 }
 
-function renderFinance() {
+/* ── 매출·매입 장부 기간 선택 ── */
+function _finAddDays(ymd, n) {
+  const [y,m,d] = ymd.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m-1, d + n));
+  return dt.toISOString().slice(0,10);
+}
+function onFinPeriodChange() {
+  const v = document.getElementById('fin-period').value;
+  const box = document.getElementById('fin-date-box');
+  if(v === 'custom') {
+    box.style.display = 'inline-flex';
+    const f = document.getElementById('fin-date-from'), t = document.getElementById('fin-date-to');
+    if(!f.value) f.value = TODAY.slice(0,7) + '-01';
+    if(!t.value) t.value = TODAY;
+  } else box.style.display = 'none';
+  renderFinance();
+}
+/* 선택한 기간을 [시작일, 종료일] (YYYY-MM-DD, 양 끝 포함)으로 반환. 전체면 null */
+function getFinRange() {
+  const v = (document.getElementById('fin-period')||{}).value || '30';
+  const ym = TODAY.slice(0,7);
+  if(v === 'all') return null;
+  if(v === 'thismonth') return [ym + '-01', TODAY];
+  if(v === 'lastmonth') {
+    const first = _finAddDays(ym + '-01', -1).slice(0,7) + '-01';
+    return [first, _finAddDays(ym + '-01', -1)];
+  }
+  if(v === 'thisyear') return [TODAY.slice(0,4) + '-01-01', TODAY];
+  if(v === 'custom') {
+    let f = (document.getElementById('fin-date-from')||{}).value || '';
+    let t = (document.getElementById('fin-date-to')||{}).value || '';
+    if(f && t && f > t) [f, t] = [t, f];
+    return [f || '0000-01-01', t || '9999-12-31'];
+  }
+  return [_finAddDays(TODAY, -parseInt(v)), TODAY];   // 최근 N일
+}
+function getFilteredFinance() {
   const q=(document.getElementById('fin-search')||{}).value?.toLowerCase()||'';
   const type=(document.getElementById('fin-type')||{}).value||'';
-  const period=(document.getElementById('fin-period')||{}).value||'30';
-  const now=new Date();
-  const fin=getFinance().filter(f=>{
+  const range=getFinRange();
+  return getFinance().filter(f=>{
     if(q) {
       const it=getItem(f.itemName);
       const codeMatch=it && it.code.toLowerCase().includes(q);
       if(!f.itemName?.toLowerCase().includes(q) && !f.partner?.toLowerCase().includes(q) && !codeMatch) return false;
     }
     if(type&&f.type!==type) return false;
-    if(period!=='all'&&(now-new Date(f.date))/(864e5)>parseInt(period)) return false;
+    if(range) {
+      const d=String(f.date||'').slice(0,10);
+      if(!d || d<range[0] || d>range[1]) return false;
+    }
     return true;
   });
-  const thisMonth=new Date().toISOString().slice(0,7);
-  const mSales=getFinance().filter(f=>f.date?.startsWith(thisMonth)&&f.type==='매출').reduce((a,b)=>a+toKrw(b),0);
+}
+
+/* ── 세 번째 카드 계산 방식: 'diff' = 매출 - 매입, 'cogs' = 매출 - 매출원가 ── */
+function getFinProfitMode() {
+  try { return localStorage.getItem('finProfitMode') === 'cogs' ? 'cogs' : 'diff'; } catch(e) { return 'diff'; }
+}
+function setFinProfitMode(m) {
+  try { localStorage.setItem('finProfitMode', m); } catch(e) {}
+  window._finProfitMode = m;
+  renderFinance();
+}
+/* 이익 = Σ (판매단가 - 입고단가) × 출고수량 = 매출 - Σ 입고단가 × 출고수량
+   입고단가: 품목 등록의 입고단가. USD면 출고일 전월말 환율로 원화 환산 (매출 금액과 같은 기준)
+   입고단가가 없거나 USD 환율이 미등록인 품목은 원가 0으로 계산하고 개수를 따로 알려줌 */
+function calcFinCogs(salesRows) {
+  const missing = new Set(), noFx = new Set();
+  let cogs = 0;
+  salesRows.forEach(s => {
+    const it = getItem(s.itemName) || {};
+    const buy = it.buyPrice || 0;
+    if(!buy) { missing.add(s.itemName); return; }
+    let unit = buy;
+    if((it.buyCurrency || 'KRW') === 'USD') {
+      const rate = (window._fxCache || {})[getPrevMonthYm(s.date || TODAY)];
+      if(!rate) { noFx.add(s.itemName); return; }
+      unit = buy * rate;
+    }
+    cogs += unit * (s.qty || 0);
+  });
+  return { cogs: Math.round(cogs), missing: missing.size, noFx: noFx.size };
+}
+function _finCogsWarn(c) {
+  const w = [];
+  if(c.missing) w.push(`입고단가 미등록 ${c.missing}품목`);
+  if(c.noFx) w.push(`USD 환율 미등록 ${c.noFx}품목`);
+  return w.join(' · ');
+}
+
+function renderFinance() {
+  const fin=getFilteredFinance();
+  const mode = window._finProfitMode || (window._finProfitMode = getFinProfitMode());
+  document.querySelectorAll('.fin-mode-seg button').forEach(b=>b.classList.toggle('on', b.dataset.m===mode));
+  // 선택 기간 합계
+  const sumEl=document.getElementById('fin-period-summary');
+  if(sumEl) {
+    const range=getFinRange();
+    const sRows=fin.filter(f=>f.type==='매출');
+    const s=sRows.reduce((a,b)=>a+toKrw(b),0);
+    const p=fin.filter(f=>f.type==='매입').reduce((a,b)=>a+toKrw(b),0);
+    const label=range ? `${range[0].startsWith('0000')?'처음':range[0]} ~ ${range[1].startsWith('9999')?'끝':range[1]}` : '전체 기간';
+    let tail;
+    if(mode==='cogs') {
+      const c=calcFinCogs(sRows);
+      tail=` · 입고원가 <span style="color:var(--red);font-weight:600">${won(c.cogs)}</span> · 이익 <span style="color:${s-c.cogs>=0?'var(--blue)':'var(--red)'};font-weight:600">${won(s-c.cogs)}</span>` +
+        (_finCogsWarn(c)?` <span style="color:var(--amber,#b7791f);">(${_finCogsWarn(c)})</span>`:'');
+    } else {
+      tail=` · 차이 <span style="color:${s-p>=0?'var(--blue)':'var(--red)'};font-weight:600">${won(s-p)}</span>`;
+    }
+    sumEl.innerHTML=`<b>${label}</b> · ${fin.length.toLocaleString()}건 · 매출 <span style="color:var(--green);font-weight:600">${won(s)}</span> · 매입 <span style="color:var(--red);font-weight:600">${won(p)}</span>${tail}`;
+  }
+  const thisMonth=TODAY.slice(0,7);
+  const mLabel=`${thisMonth.slice(0,4)}년 ${parseInt(thisMonth.slice(5))}월 1일~ · `;
+  document.querySelectorAll('.f-month-range').forEach(el=>el.textContent=mLabel);
+  const mSalesRows=getFinance().filter(f=>f.date?.startsWith(thisMonth)&&f.type==='매출');
+  const mSales=mSalesRows.reduce((a,b)=>a+toKrw(b),0);
   const mPurch=getFinance().filter(f=>f.date?.startsWith(thisMonth)&&f.type==='매입').reduce((a,b)=>a+toKrw(b),0);
-  const mProfit=mSales-mPurch;
+  let mProfit;
+  const lblEl=document.getElementById('f-profit-label'), subEl=document.getElementById('f-profit-sub');
+  if(mode==='cogs') {
+    const c=calcFinCogs(mSalesRows);
+    mProfit=mSales-c.cogs;
+    if(lblEl) lblEl.textContent='이번 달 이익';
+    if(subEl) subEl.textContent=`(판매단가-입고단가)×출고수량 · 입고원가 ${won(c.cogs)}`+(_finCogsWarn(c)?` · ⚠ ${_finCogsWarn(c)}`:'');
+  } else {
+    mProfit=mSales-mPurch;
+    if(lblEl) lblEl.textContent='이번 달 매출 - 매입';
+    if(subEl) subEl.textContent='매출 합계 - 매입 합계';
+  }
   document.getElementById('f-sales').textContent=won(mSales);
   document.getElementById('f-purchase').textContent=won(mPurch);
   const pel=document.getElementById('f-profit-month');
@@ -5880,7 +6299,7 @@ async function deleteReceivable(id) {
 }
 
 function exportFinanceCSV() {
-  const fin=getFinance();
+  const fin=getFilteredFinance();   // 화면에 보이는 조건(검색·구분·기간) 그대로 내보내기
   const rows=[['일자','구분','품목명','수량','단가','금액','거래처','결제','비고']];
   fin.forEach(f=>rows.push([f.date,f.type,f.itemName,f.qty,f.price||0,f.amount||0,f.partner||'',f.paid==='paid'?'완료':'외상',f.note||'']));
   const csv='\uFEFF'+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
@@ -8216,7 +8635,105 @@ function openImportModal() {
   document.getElementById('imp-progress-bar').style.width = '0%';
   document.getElementById('imp-run-btn').disabled = true;
   document.getElementById('imp-cancel-btn').disabled = false;
+  document.getElementById('imp-partner-wrap').style.display = 'none';
+  window._impPartnerMap = {};
   document.getElementById('import-modal').classList.add('open');
+  loadPartnerAliases();
+}
+
+/* ── 거래처명 별칭 (엑셀 이름 → 등록 거래처) 기억: settings/partner-aliases ── */
+async function loadPartnerAliases() {
+  try {
+    const d = window._db_getSetting ? await window._db_getSetting('partner-aliases') : null;
+    const m = {};
+    ((d && d.list) || []).forEach(a => { if(a && a.from && a.to) m[a.from] = a.to; });
+    window._partnerAliases = m;
+  } catch(e) { window._partnerAliases = window._partnerAliases || {}; }
+}
+async function savePartnerAliases(newPairs) {
+  const m = Object.assign({}, window._partnerAliases || {}, newPairs);
+  window._partnerAliases = m;
+  try {
+    if(window._db_setSetting) await window._db_setSetting('partner-aliases', { list: Object.entries(m).map(([from,to])=>({from,to})) });
+  } catch(e) { console.warn('거래처 별칭 저장 실패', e); }
+}
+/* 엑셀 거래처명들의 매칭 초기값 계산 */
+function buildImportPartnerMap(rawNames) {
+  const customers = getCustomers();
+  const reg = new Set(customers.map(c=>c.name));
+  const aliases = window._partnerAliases || {};
+  const map = {}, how = {};
+  if(customers.length === 0) return { map, how };   // 거래처 미등록 상태면 확인 생략
+  rawNames.forEach(n => {
+    if(!n || reg.has(n)) return;
+    if(aliases[n] && reg.has(aliases[n])) { map[n] = aliases[n]; how[n] = '기억'; return; }
+    const { pick } = _pmCandidates(n, customers);
+    if(pick && (pick.why === '일치' || pick.why === '포함')) { map[n] = pick.name; how[n] = '자동'; return; }
+    map[n] = ''; how[n] = '선택';
+  });
+  return { map, how };
+}
+function renderImportPartnerRows() {
+  const wrap = document.getElementById('imp-partner-wrap');
+  const map = window._impPartnerMap || {}, how = window._impPartnerHow || {};
+  const names = Object.keys(map).sort((a,b)=>a.localeCompare(b,'ko'));
+  if(!names.length || getCustomers().length === 0) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  const cnt = {};
+  (_impRecords||[]).forEach(r => { cnt[r.rawPartner] = (cnt[r.rawPartner]||0) + 1; });
+  const customers = getCustomers();
+  const esc = _ptEsc;
+  const need = names.filter(n => !map[n]).length;
+  document.getElementById('imp-partner-title').innerHTML =
+    `🏢 거래처 관리에 없는 거래처명 ${names.length}개` + (need ? ` · <span style="color:var(--red)">${need}개는 직접 선택해 주세요</span>` : ' · 모두 정리됨 ✓');
+  document.getElementById('imp-partner-body').innerHTML = names.map(n => {
+    const { list } = _pmCandidates(n, customers);
+    const top = list.slice(0,5), rest = list.slice(5).sort((x,y)=>x.name.localeCompare(y.name,'ko'));
+    const v = map[n];
+    const opt = c => `<option value="${esc(c.name)}"${v===c.name?' selected':''}>${esc(c.name)}</option>`;
+    const st = !v ? '<span class="badge badge-red">선택 필요</span>'
+      : v === '__keep__' ? '<span class="badge badge-amber">그대로</span>'
+      : how[n] === '기억' ? '<span class="badge badge-blue">지난번 선택</span>'
+      : how[n] === '자동' ? '<span class="badge badge-green">자동 변경</span>'
+      : '<span class="badge badge-blue">선택함</span>';
+    return `<tr>
+      <td style="font-weight:600">${esc(n)}</td>
+      <td class="num">${cnt[n]||0}</td>
+      <td><select class="form-control imp-psel" data-raw="${esc(n)}" onchange="onImportPartnerChange(this)" style="font-size:12px;padding:4px 8px;min-width:230px;${!v?'border-color:var(--red);':''}">
+        <option value=""${!v?' selected':''}>— 선택하세요 —</option>
+        <option value="__keep__"${v==='__keep__'?' selected':''}>(바꾸지 않고 "${esc(n)}" 그대로 등록)</option>
+        <optgroup label="비슷한 이름">${top.map(opt).join('')}</optgroup>
+        <optgroup label="전체 등록 거래처">${rest.map(opt).join('')}</optgroup>
+      </select></td>
+      <td>${st}</td>
+    </tr>`;
+  }).join('');
+}
+function onImportPartnerChange(sel) {
+  window._impPartnerMap[sel.dataset.raw] = sel.value;
+  (window._impPartnerHow = window._impPartnerHow || {})[sel.dataset.raw] = '직접';
+  applyImportPartnerMap();
+  renderImportPartnerRows();
+  renderImportPreview();
+}
+/* 매칭 결과를 레코드에 반영 (거래처명 + 거래처별 단가 재조회) */
+function applyImportPartnerMap() {
+  const map = window._impPartnerMap || {};
+  (_impRecords||[]).forEach(r => {
+    const t = map[r.rawPartner];
+    r.partner = (t && t !== '__keep__') ? t : r.rawPartner;
+    r.price = 0;
+    if(r.itemName) {
+      const pp = getPartnerPrice(r.itemName, r.partner, r.type==='in'?'매입':'매출', r.date);
+      const it = getItem(r.itemName);
+      r.price = pp ? (pp.price||0) : (r.type==='in' ? (it&&it.buyPrice||0) : (it&&it.sellPrice||0));
+    }
+  });
+}
+function importPartnerPending() {
+  const map = window._impPartnerMap || {};
+  const used = new Set((_impRecords||[]).filter(r=>r.ok && !r.dup).map(r=>r.rawPartner));
+  return Object.keys(map).filter(n => used.has(n) && !map[n]);
 }
 function closeImportModal(){ document.getElementById('import-modal').classList.remove('open'); }
 document.getElementById('import-modal').addEventListener('click', e=>{
@@ -8306,7 +8823,7 @@ function parseImportSheet() {
 
     dateCols.forEach(ci=>{
       const v = row[ci];
-      if(typeof v === 'number' && v > 0){
+      if(typeof v === 'number' && v !== 0){   // 음수(반품·정정)도 포함
         const day = dateMap[ci];
         const date = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
         const itemName = codeToName[curCode]||null;
@@ -8317,7 +8834,7 @@ function parseImportSheet() {
           price = pp ? (pp.price||0) : (type==='in' ? (it&&it.buyPrice||0) : (it&&it.sellPrice||0));
         }
         recs.push({
-          type, code:curCode, itemName, partner, date,
+          type, code:curCode, itemName, partner, rawPartner:partner, date,
           qty:Math.round(v), price, ok:!!itemName
         });
       }
@@ -8326,34 +8843,74 @@ function parseImportSheet() {
   recs.sort((a,b)=>a.date.localeCompare(b.date));
   _impRecords = recs;
 
-  const ok = recs.filter(r=>r.ok);
+  // 거래처명 확인: 거래처 관리에 없는 이름은 자동 변경 또는 선택 요청
+  const pm = buildImportPartnerMap([...new Set(recs.filter(r=>r.ok).map(r=>r.rawPartner))]);
+  window._impPartnerMap = pm.map; window._impPartnerHow = pm.how;
+  applyImportPartnerMap();
+  renderImportPartnerRows();
+  renderImportPreview();
+}
+
+/* 이미 시스템에 있는 건 표시 (같은 날짜·유형·품목·수량, 개수 기준으로 1:1 대응) */
+function markImportDuplicates() {
+  const cnt = new Map();
+  const key = (date,type,item,qty) => `${date}|${type}|${item}|${qty}`;
+  getHistory().forEach(h => { const k = key(h.date,h.type,h.itemName,Number(h.qty)||0); cnt.set(k,(cnt.get(k)||0)+1); });
+  (_impRecords||[]).forEach(r => {
+    r.dup = false;
+    if(!r.ok) return;
+    const k = key(r.date,r.type,r.itemName,r.qty);
+    const n = cnt.get(k)||0;
+    if(n > 0) { r.dup = true; cnt.set(k, n-1); }
+  });
+}
+function renderImportPreview() {
+  const recs = _impRecords || [];
+  markImportDuplicates();
+  const dupCnt = recs.filter(r=>r.ok && r.dup).length;
+  const ok = recs.filter(r=>r.ok && !r.dup);
   const inCnt = ok.filter(r=>r.type==='in').length;
   const outCnt = ok.filter(r=>r.type==='out').length;
+  const pending = importPartnerPending();
   document.getElementById('imp-summary').style.display='block';
   document.getElementById('imp-summary').innerHTML =
-    `총 <strong>${recs.length}건</strong> 발견 &nbsp;|&nbsp; 등록 가능 <strong style="color:var(--green)">${ok.length}건</strong> (입고 ${inCnt} / 출고 ${outCnt}) &nbsp;|&nbsp; 품목 미등록 <strong style="color:var(--red)">${recs.length-ok.length}건</strong>`;
+    `총 <strong>${recs.length}건</strong> 발견 &nbsp;|&nbsp; 등록 가능 <strong style="color:var(--green)">${ok.length}건</strong> (입고 ${inCnt} / 출고 ${outCnt}) &nbsp;|&nbsp; 품목 미등록 <strong style="color:var(--red)">${recs.filter(r=>!r.ok).length}건</strong>` +
+    (dupCnt ? ` &nbsp;|&nbsp; 이미 등록됨 <strong>${dupCnt}건</strong>(건너뜀)` : '') +
+    (recs.some(r=>r.qty<0) ? ` &nbsp;|&nbsp; 음수(반품·정정) <strong>${recs.filter(r=>r.qty<0).length}건</strong> 포함` : '') +
+    (pending.length ? ` &nbsp;|&nbsp; <strong style="color:var(--red)">거래처 선택 필요 ${pending.length}개</strong>` : '');
 
   document.getElementById('imp-preview').style.display='block';
   document.getElementById('imp-preview-body').innerHTML = recs.length===0
     ? `<tr><td colspan="8"><div class="empty">데이터가 없습니다.</div></td></tr>`
-    : recs.map(r=>`<tr style="${r.ok?'':'opacity:.45;'}">
+    : recs.map(r=>`<tr style="${r.ok&&!r.dup?'':'opacity:.45;'}">
         <td style="font-size:11px">${r.date}</td>
         <td><span class="badge ${r.type==='in'?'badge-green':'badge-red'}">${r.type==='in'?'입고':'출고'}</span></td>
         <td class="mono" style="font-size:11px">${r.code}</td>
         <td style="font-size:11px">${r.itemName||'—'}</td>
-        <td style="font-size:11px">${r.partner}</td>
-        <td style="font-weight:600">${r.qty.toLocaleString()}</td>
+        <td style="font-size:11px">${_ptEsc(r.partner)}${r.partner!==r.rawPartner?`<div style="font-size:10px;color:var(--text3);text-decoration:line-through;">${_ptEsc(r.rawPartner)}</div>`:''}</td>
+        <td style="font-weight:600;${r.qty<0?'color:var(--red);':''}">${r.qty.toLocaleString()}</td>
         <td style="font-size:11px">${r.price?r.price.toLocaleString()+'원':'—'}</td>
-        <td>${r.ok?'<span class="badge badge-green">등록가능</span>':'<span class="badge badge-red">품목없음</span>'}</td>
+        <td>${r.ok&&r.dup?'<span class="badge" style="background:var(--surface2);color:var(--text3);">이미 등록</span>':!r.ok?'<span class="badge badge-red">품목없음</span>':(window._impPartnerMap||{})[r.rawPartner]===''?'<span class="badge badge-amber">거래처 선택</span>':'<span class="badge badge-green">등록가능</span>'}</td>
       </tr>`).join('');
 
-  document.getElementById('imp-run-btn').disabled = ok.length===0;
+  const btn = document.getElementById('imp-run-btn');
+  btn.disabled = ok.length===0 || pending.length>0;
+  btn.title = pending.length ? `거래처 ${pending.length}개를 먼저 선택하세요` : '';
 }
 
 async function executeImport() {
-  const list = _impRecords.filter(r=>r.ok);
+  markImportDuplicates();
+  const list = _impRecords.filter(r=>r.ok && !r.dup);
   if(list.length===0){ showToast('⚠ 등록할 데이터가 없습니다.'); return; }
-  if(!confirm(`${list.length}건을 등록합니다.\n입고 ${list.filter(r=>r.type==='in').length}건 / 출고 ${list.filter(r=>r.type==='out').length}건\n\n재고에 반영됩니다. 진행할까요?`)) return;
+  const pendingP = importPartnerPending();
+  if(pendingP.length){ showToast(`⚠ 거래처를 먼저 선택하세요: ${pendingP.join(', ')}`); return; }
+  applyImportPartnerMap();
+  // 고른 매칭 기억 (다음 업로드 때 자동 적용)
+  const pairs = {};
+  Object.entries(window._impPartnerMap||{}).forEach(([from,to]) => { if(to && to!=='__keep__') pairs[from] = to; });
+  const changed = Object.entries(pairs).map(([f,t])=>`  • ${f} → ${t}`).join('\n');
+  if(!confirm(`${list.length}건을 등록합니다.\n입고 ${list.filter(r=>r.type==='in').length}건 / 출고 ${list.filter(r=>r.type==='out').length}건\n\n재고에 반영됩니다. 진행할까요?${changed?`\n\n거래처명 변경:\n${changed}`:''}`)) return;
+  if(Object.keys(pairs).length) savePartnerAliases(pairs);
 
   document.getElementById('imp-run-btn').disabled = true;
   document.getElementById('imp-cancel-btn').disabled = true;
