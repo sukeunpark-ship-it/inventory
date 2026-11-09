@@ -77,7 +77,7 @@
   function applyFinanceAccess(email) {
     const hasFinance = window._financeEmails.includes(email);
     const isSuperAdmin = email === SUPER_ADMIN;
-    const ids = ['nav-section-finance','nav-finance','nav-profit'];
+    const ids = ['nav-section-finance','nav-finance','nav-profit','nav-volplan'];
     ids.forEach(id => {
       const el = document.getElementById(id);
       if(el) el.style.display = hasFinance ? '' : 'none';
@@ -341,6 +341,9 @@
   };
   window._db_setSetting = async (key, obj) => {
     await setDoc(doc(db, "settings", key), obj, { merge: true });
+  };
+  window._db_replaceSetting = async (key, obj) => {   // 병합 없이 통째로 덮어쓰기
+    await setDoc(doc(db, "settings", key), obj);
   };
   // 업체별 단가 (key: itemCode_partner_type)
   window._db_setPrice = async (id, obj) => {
@@ -625,6 +628,27 @@ textarea.form-control{min-height:64px;resize:vertical;}
 /* Loading skeleton */
 .skeleton{background:linear-gradient(90deg,var(--surface2) 25%,#e8e7e0 50%,var(--surface2) 75%);background-size:200% 100%;animation:shimmer 1.4s infinite;border-radius:4px;height:14px;}
 @keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+  /* 연간 물동량 계획 */
+  #tab-volplan { max-width:calc(100vw - 276px); }   /* 사이드바(220)+여백(56): 넓은 표는 안에서 스크롤 */
+  .vp-wrap { overflow:auto; max-height:68vh; }
+  .vp-table { border-collapse:separate; border-spacing:0; font-size:12px; min-width:100%; }
+  .vp-table th { position:sticky; top:0; z-index:3; background:var(--surface2); color:var(--text2); font-weight:600; padding:7px 6px; border-bottom:1px solid var(--border2); white-space:nowrap; text-align:center; }
+  .vp-table td { padding:3px 4px; border-bottom:1px solid var(--border); white-space:nowrap; background:var(--surface); }
+  .vp-table .sl { position:sticky; z-index:2; }
+  .vp-table th.sl { z-index:4; }
+  .vp-table td.num, .vp-table th.num { text-align:right; }
+  .vp-table input { width:100%; box-sizing:border-box; border:1px solid transparent; background:transparent; font:inherit; padding:4px 5px; border-radius:4px; color:var(--text); }
+  .vp-table input:hover { border-color:var(--border2); }
+  .vp-table input:focus { outline:none; border-color:var(--blue-mid); background:var(--surface); }
+  .vp-table input.q { text-align:right; background:#FFFBE6; width:72px; }
+  .vp-table input.p { text-align:right; width:70px; }
+  .vp-table td.qs { background:var(--surface2); font-weight:600; text-align:right; }
+  .vp-table tr.vp-grp td { background:var(--blue-bg); font-weight:700; color:var(--blue); }
+  .vp-table tr.vp-grp td.sl { background:var(--blue-bg); }
+  .vp-table tr.vp-total td { background:var(--surface2); font-weight:700; border-top:2px solid var(--border2); position:sticky; bottom:0; z-index:2; }
+  .vp-table .vp-nolink { color:var(--amber,#b7791f); font-size:10px; }
+  .vp-table .vp-del { border:none; background:none; color:var(--text3); cursor:pointer; font-size:14px; padding:0 4px; }
+  .vp-table .vp-del:hover { color:var(--red); }
   /* 단가표 */
   .pt-seg { display:inline-flex; border:1px solid var(--border2); border-radius:var(--r); overflow:hidden; }
   .pt-seg button { border:none; background:var(--surface); color:var(--text2); padding:5px 12px; font-size:12px; cursor:pointer; font-family:'Noto Sans KR',sans-serif; }
@@ -791,6 +815,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
       <div class="nav-section" id="nav-section-finance" style="display:none">재무</div>
       <div class="nav-item" onclick="showTab('finance')" id="nav-finance" style="display:none"><span class="icon">₩</span> 매출·매입 장부</div>
       <div class="nav-item" onclick="showTab('profit')" id="nav-profit" style="display:none"><span class="icon">◎</span> 손익 현황</div>
+      <div class="nav-item" onclick="showTab('volplan')" id="nav-volplan" style="display:none"><span class="icon">📈</span> 연간 물동량 계획</div>
       <div class="nav-section">단가 관리</div>
       <div class="nav-item" onclick="showTab('pricehistory')" id="nav-pricehistory"><span class="icon">↻</span> 출고 단가 변동 이력</div>
       <div class="nav-item" onclick="showTab('buypricehistory')" id="nav-buypricehistory"><span class="icon">↻</span> 입고 단가 변동 이력</div>
@@ -1403,6 +1428,43 @@ textarea.form-control{min-height:64px;resize:vertical;}
       </div>
 
       <!-- 손익 현황 -->
+      <!-- 연간 물동량 계획 -->
+      <div class="tab-content" id="tab-volplan">
+        <div class="metrics" style="grid-template-columns:repeat(4,1fr);">
+          <div class="metric-card"><div class="metric-label" id="vp-m-label-s">계획 매출</div><div class="metric-value green" id="vp-m-sales">—</div><div class="metric-sub" id="vp-m-sales-sub">판매가 × 수량</div></div>
+          <div class="metric-card"><div class="metric-label">계획 매입</div><div class="metric-value red" id="vp-m-buy">—</div><div class="metric-sub">구매가 × 수량</div></div>
+          <div class="metric-card"><div class="metric-label">계획 이익</div><div class="metric-value" id="vp-m-profit" style="color:var(--blue)">—</div><div class="metric-sub" id="vp-m-profit-sub">매출 - 매입</div></div>
+          <div class="metric-card"><div class="metric-label">출고 실적 (수량 기준)</div><div class="metric-value" id="vp-m-actual">—</div><div class="metric-sub" id="vp-m-actual-sub">계획 대비 달성률</div></div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+          <select class="form-control" id="vp-year" onchange="openVolPlanTab()" style="width:110px;"></select>
+          <span style="font-size:12px;color:var(--text2);">묶어보기</span>
+          <div class="pt-seg">
+            <button type="button" data-g="customer" onclick="setVolPlanGroup('customer')">업체별</button>
+            <button type="button" data-g="part" onclick="setVolPlanGroup('part')">부품별</button>
+            <button type="button" data-g="cat" onclick="setVolPlanGroup('cat')">카테고리별</button>
+          </div>
+          <select class="form-control" id="vp-cat" onchange="renderVolPlan()" style="width:200px;"><option value="">전체 카테고리</option></select>
+          <input class="form-control" type="text" id="vp-search" placeholder="업체·품목코드·Spec 검색..." oninput="renderVolPlan()" style="width:200px;">
+          <span id="vp-save-state" style="font-size:11px;color:var(--text3);"></span>
+          <span style="flex:1"></span>
+          <button class="btn btn-primary btn-sm" onclick="generateVolPlanFromItems()" title="품목 등록된 부품마다, 업체별 단가·출고 이력이 있는 업체를 하위 행으로 자동 생성">⚙ 등록 품목으로 자동 생성</button>
+          <button class="btn btn-secondary btn-sm" onclick="addVolPlanRow()">＋ 행 추가</button>
+          <button class="btn btn-info btn-sm" onclick="document.getElementById('vp-file').click()">📥 물동량 엑셀 불러오기</button>
+          <input type="file" id="vp-file" accept=".xls,.xlsx" multiple style="display:none" onchange="importVolPlanExcel(this)">
+          <button class="btn btn-secondary btn-sm" onclick="exportVolPlanExcel()">⬇ 엑셀</button>
+          <button class="btn btn-danger btn-sm" onclick="clearVolPlan()" title="이 연도의 물동량 계획을 모두 지웁니다 (직전 내용은 되돌리기용으로 보관)">🗑 전체 삭제</button>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin-bottom:8px;">노란 칸에 월별 예상 수량을 넣으면 바로 계산·저장됩니다. 업체·품목코드·Spec·판매가·구매가도 칸을 눌러 고칠 수 있습니다. 실적은 같은 연도의 출고 이력(품목 + 업체명 일치) 수량입니다.</div>
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div class="vp-wrap" id="vp-table-wrap"><div class="empty" style="padding:30px;">불러오는 중...</div></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">분기별 계획 합계</div></div>
+          <div class="card-body" id="vp-quarter"></div>
+        </div>
+      </div>
+
       <div class="tab-content" id="tab-profit">
         <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap;">
           <span style="font-size:12px;font-weight:600;color:var(--text2);">기간</span>
@@ -2223,6 +2285,7 @@ const PAGE_META = {
   chart:['통계 차트','입출고 현황을 시각화합니다'],
   finance:['매출·매입 장부','수입·지출 내역을 확인하세요'],
   profit:['손익 현황','매출 - 매입 = 이익을 분석하세요'],
+  volplan:['연간 물동량 계획','업체·부품별 월 예상 수량을 넣으면 매출·매입·이익이 자동 계산됩니다'],
   receivable:['미수금·미지급금','외상 거래를 관리하세요'],
   prices:['출고업체별 단가 검색','거래처별 품목 단가를 관리하세요'],
   pricehistory:['출고 단가 변동 이력','단가 변경 이력을 확인하세요'],
@@ -2366,6 +2429,35 @@ function getBaseStock(item) {
   return f.type==='in' ? f.afterStock - (f.qty||0) : f.afterStock + (f.qty||0);
 }
 
+/* ── 날짜순 '처리 후 재고' ──
+   저장된 afterStock은 '등록하던 순간'의 재고라서, 지난 날짜 내역을 나중에(예: 대량 업로드로 8월분을 11월에) 넣으면
+   그 날짜 기준 재고와 다르게 보임. 화면·내보내기에는 기준재고에서 날짜순으로 다시 계산한 값을 사용
+   (runReconcile 과 같은 순서·같은 기준 → 마지막 값 = 현재고) */
+let _runStockCache = { src: null, map: null };
+function getRunningStockMap() {
+  const hist = getHistory();
+  if(_runStockCache.src === hist && _runStockCache.map) return _runStockCache.map;
+  const seq = (h) => (h.date||'') + '|' + String((h.createdAt&&h.createdAt.seconds)||9999999999).padStart(12,'0');
+  const byItem = {};
+  hist.forEach(h => { const n = (h.itemName||'').trim(); if(n) (byItem[n] = byItem[n] || []).push(h); });
+  const map = new Map();
+  Object.entries(byItem).forEach(([name, list]) => {
+    const it = getItem(name);
+    if(!it) { list.forEach(h => map.set(h._id, h.afterStock)); return; }
+    let run = getBaseStock(it);
+    list.slice().sort((a,b)=>seq(a).localeCompare(seq(b))).forEach(h => {
+      run += (h.type==='in' ? (Number(h.qty)||0) : -(Number(h.qty)||0));
+      map.set(h._id, run);
+    });
+  });
+  _runStockCache = { src: hist, map };
+  return map;
+}
+function runStockOf(h) {
+  const v = getRunningStockMap().get(h._id);
+  return typeof v === 'number' ? v : (h.afterStock||0);
+}
+
 async function runReconcile() {
   if(_reconcileBusy) return;
   const items = getItems();
@@ -2480,6 +2572,7 @@ function showTab(id) {
   if(id==='in'||id==='out'){ populateSelects(); renderTodayLists(); }
   if(id==='chart'){ renderChartMetrics(); setTimeout(renderCharts,60); }
   if(id==='finance') renderFinance();
+  if(id==='volplan') openVolPlanTab();
   if(id==='profit'){ renderProfit(); setTimeout(()=>{renderProfitChart();renderSalesChart();},60); }
   if(id==='receivable') renderReceivable();
   if(id==='prices') renderPrices();
@@ -2723,7 +2816,7 @@ function histSortValue(h, key) {
     case 'price': return h.price||0;
     case 'amount': return h.amount||0;
     case 'partner': return h.partner||'';
-    case 'afterStock': return h.afterStock||0;
+    case 'afterStock': return runStockOf(h);
     default: return '';
   }
 }
@@ -3022,6 +3115,550 @@ function renderPriceTable() {
   });
   body.innerHTML = `<table class="pt-table"><thead>${head}</thead><tbody>${html}</tbody></table>`;
 }
+/* ══════════════════════════════════════════════════════════════════════
+   연간 물동량 계획 (업체 × 부품 × 월 예상 수량 → 매출·매입·이익 자동 계산)
+   저장: settings/volume-plan-YYYY  { rows: { <id>: row }, updatedAt, updatedBy }
+   row = { id, cat, customer, code, spec, sell, buy, qty:[12], order, deleted? }
+   ══════════════════════════════════════════════════════════════════════ */
+window._vp = { year: null, rows: {}, group: 'part', loaded: false, dirty: new Set(), timer: null };
+const VP_MONTHS = [1,2,3,4,5,6,7,8,9,10,11,12];
+
+function vpRowsList() {
+  return Object.values(window._vp.rows || {}).filter(r => r && !r.deleted)
+    .sort((a,b) => (a.order||0) - (b.order||0));
+}
+function vpNum(v) { const n = parseFloat(String(v==null?'':v).replace(/,/g,'')); return isFinite(n) ? n : 0; }
+function vpQtySum(r) { return (r.qty||[]).reduce((a,b)=>a+vpNum(b),0); }
+function vpFmt(n, d) { if(!n) return '—'; return Number(n).toLocaleString('ko-KR', {maximumFractionDigits: d==null?0:d}); }
+function vpWon(n) { return Math.round(n||0).toLocaleString() + '원'; }
+
+/* ERP 품목 연결: 코드 그대로 → 0을 뺀 코드 비교(오타 보정) → Spec(Maker P/no) 비교 */
+function vpLinkItem(r) {
+  const items = getItems();
+  const code = String(r.code||'').trim().toUpperCase();
+  if(code) {
+    let it = items.find(i => String(i.code||'').toUpperCase() === code);
+    if(it) return it;
+    const z = s => String(s||'').toUpperCase().replace(/0/g,'');
+    const m = items.filter(i => z(i.code) === z(code));
+    if(m.length === 1) return m[0];
+  }
+  const n = s => String(s||'').toUpperCase().replace(/[^0-9A-Z가-힣]/g,'');
+  const sp = n(String(r.spec||'').split('\n')[0]);
+  if(sp.length >= 4) {
+    let m = items.filter(i => n(i.name) === sp);
+    if(m.length === 1) return m[0];
+    m = items.filter(i => { const x = n(i.name); return x && (x.includes(sp) || sp.includes(x)); });
+    if(m.length === 1) return m[0];
+  }
+  return null;
+}
+
+/* 같은 연도 출고 실적 (품목 + 업체명 일치) → 월별 수량 */
+function vpActual(r, year) {
+  const it = vpLinkItem(r);
+  const out = new Array(12).fill(0);
+  if(!it) return { months: out, total: 0, linked: false };
+  const cn = _pmNorm(r.customer);
+  getHistory().forEach(h => {
+    if(h.type !== 'out' || h.itemName !== it.name || !String(h.date||'').startsWith(year + '-')) return;
+    if(cn) {
+      const pn = _pmNorm(h.partner);
+      if(!pn || !(pn === cn || pn.includes(cn) || cn.includes(pn))) return;
+    }
+    const m = parseInt(String(h.date).slice(5,7)) - 1;
+    if(m >= 0 && m < 12) out[m] += Number(h.qty)||0;
+  });
+  return { months: out, total: out.reduce((a,b)=>a+b,0), linked: true, item: it };
+}
+
+async function openVolPlanTab() {
+  const ysel = document.getElementById('vp-year');
+  if(!ysel.options.length) {
+    const cy = parseInt(TODAY.slice(0,4));
+    const yrs = [cy-1, cy, cy+1, cy+2];
+    ysel.innerHTML = yrs.map(y => `<option value="${y}">${y}년</option>`).join('');
+    ysel.value = String(cy + 1 <= 2027 ? 2027 : cy + 1);
+    if(!yrs.includes(parseInt(ysel.value))) ysel.value = String(cy);
+  }
+  const year = ysel.value;
+  if(window._vp.year !== year || !window._vp.loaded) {
+    await vpFlush();
+    window._vp.year = year; window._vp.rows = {}; window._vp.loaded = false;
+    document.getElementById('vp-table-wrap').innerHTML = '<div class="empty" style="padding:30px;">불러오는 중...</div>';
+    try {
+      const d = window._db_getSetting ? await window._db_getSetting('volume-plan-' + year) : null;
+      window._vp.rows = (d && d.rows) || {};
+    } catch(e) { console.warn('물동량 계획 로드 실패', e); showToast('⚠ 물동량 계획을 불러오지 못했습니다.'); }
+    window._vp.loaded = true;
+  }
+  renderVolPlan();
+}
+function setVolPlanGroup(g) { window._vp.group = g; renderVolPlan(); }
+
+function vpFiltered() {
+  const q = (document.getElementById('vp-search')||{}).value?.toLowerCase().trim() || '';
+  const cat = (document.getElementById('vp-cat')||{}).value || '';
+  return vpRowsList().filter(r => {
+    if(cat && (r.cat||'(미분류)') !== cat) return false;
+    if(q && ![r.customer, r.code, r.spec, r.cat].some(v => String(v||'').toLowerCase().includes(q))) return false;
+    return true;
+  });
+}
+
+function renderVolPlan() {
+  const V = window._vp, esc = _ptEsc;
+  document.querySelectorAll('#tab-volplan .pt-seg button').forEach(b => b.classList.toggle('on', b.dataset.g === V.group));
+  // 카테고리 목록
+  const csel = document.getElementById('vp-cat'), cur = csel.value;
+  const cats = [...new Set(vpRowsList().map(r => r.cat || '(미분류)'))].sort((a,b)=>a.localeCompare(b,'ko'));
+  csel.innerHTML = '<option value="">전체 카테고리</option>' + cats.map(c => `<option${c===cur?' selected':''}>${esc(c)}</option>`).join('');
+  const rows = vpFiltered();
+  const wrap = document.getElementById('vp-table-wrap');
+  if(!vpRowsList().length) {
+    wrap.innerHTML = `<div class="empty" style="padding:30px;line-height:1.8;">${V.year}년 물동량 계획이 아직 없습니다.<br>
+      <b>⚙ 등록 품목으로 자동 생성</b>을 누르면 품목 등록된 부품마다 거래 업체가 하위 행으로 자동으로 들어갑니다.<br>
+      <b>📥 물동량 엑셀 불러오기</b>로 물동량 엑셀(.xls)을 올리거나, <b>＋ 행 추가</b>로 직접 입력할 수도 있습니다.
+      <div id="vp-restore-box" style="margin-top:10px;"></div></div>`;
+    vpShowRestore();
+    vpUpdateTotals(); return;
+  }
+  // 정렬·그룹
+  const keyOf = r => V.group === 'part' ? (r.code || r.spec || '(품목 미지정)') + (r.code && r.spec ? ' · ' + String(r.spec).split('\n')[0] : '') + (r.cat ? '  [' + r.cat + ']' : '')
+                   : V.group === 'cat' ? (r.cat || '(미분류)') : (r.customer || '(업체 미지정)');
+  const groups = new Map();
+  rows.forEach(r => { const k = keyOf(r); if(!groups.has(k)) groups.set(k, []); groups.get(k).push(r); });
+  const gkeys = [...groups.keys()];
+  if(V.group !== 'cat') gkeys.sort((a,b)=>a.localeCompare(b,'ko'));
+  const head = `<tr>
+    <th class="sl" data-sl="0" style="left:0;">업체</th>
+    <th class="sl" data-sl="1">품목코드</th>
+    <th class="sl" data-sl="2" style="box-shadow:2px 0 0 var(--border2);">Spec</th>
+    <th class="num">판매가</th><th class="num">구매가</th>
+    ${VP_MONTHS.map(m=>`<th class="num">${m}월</th>`).join('')}
+    <th class="num">연간 수량</th><th class="num">매출</th><th class="num">매입</th><th class="num">이익</th><th class="num">이익률</th>
+    <th class="num" title="같은 연도 출고 이력 수량">실적 수량</th><th class="num">달성률</th><th></th></tr>`;
+  let body = '', gi = 0;
+  gkeys.forEach(k => {
+    const list = groups.get(k);
+    gi++;
+    body += `<tr class="vp-grp"><td class="sl" style="left:0" colspan="3">${esc(k)} <span style="font-weight:400;color:var(--text3)">(${list.length})</span></td>
+      <td></td><td></td>${VP_MONTHS.map(m=>`<td class="num" id="vp-g${gi}-m${m}"></td>`).join('')}
+      <td class="num" id="vp-g${gi}-q"></td><td class="num" id="vp-g${gi}-s"></td><td class="num" id="vp-g${gi}-b"></td><td class="num" id="vp-g${gi}-p"></td><td class="num" id="vp-g${gi}-r"></td><td class="num" id="vp-g${gi}-a"></td><td></td><td></td></tr>`;
+    list.forEach(r => {
+      r._g = gi;
+      const it = vpLinkItem(r);
+      body += `<tr data-id="${r.id}">
+        <td class="sl" style="left:0"><input value="${esc(r.customer||'')}" data-f="customer" style="min-width:84px" placeholder="(업체 입력)"></td>
+        <td class="sl" data-sl="1"><input value="${esc(r.code||'')}" data-f="code" style="min-width:104px;font-family:monospace" placeholder="품목코드">${it?'':'<div class="vp-nolink" title="ERP 품목과 연결 안 됨 — 실적 비교 불가">● 품목 미연결</div>'}</td>
+        <td class="sl" data-sl="2" style="box-shadow:2px 0 0 var(--border2);"><input value="${esc(String(r.spec||'').replace(/\n/g,' '))}" data-f="spec" style="min-width:150px" placeholder="Spec" title="${esc(r.cat||'')}"></td>
+        <td><input class="p" value="${r.sell??''}" data-f="sell" inputmode="decimal"></td>
+        <td><input class="p" value="${r.buy??''}" data-f="buy" inputmode="decimal"></td>
+        ${VP_MONTHS.map((m,i)=>`<td><input class="q" value="${vpNum((r.qty||[])[i])||''}" data-f="q${i}" inputmode="numeric"></td>`).join('')}
+        <td class="qs" id="vp-r${r.id}-q"></td>
+        <td class="num" id="vp-r${r.id}-s"></td><td class="num" id="vp-r${r.id}-b"></td><td class="num" id="vp-r${r.id}-p"></td><td class="num" id="vp-r${r.id}-r"></td>
+        <td class="num" id="vp-r${r.id}-a"></td><td class="num" id="vp-r${r.id}-ar"></td>
+        <td><button class="vp-del" title="행 삭제" onclick="deleteVolPlanRow('${r.id}')">×</button></td>
+      </tr>`;
+    });
+  });
+  body += `<tr class="vp-total"><td class="sl" style="left:0" colspan="3">합계 (${rows.length}행)</td><td></td><td></td>
+    ${VP_MONTHS.map(m=>`<td class="num" id="vp-t-m${m}"></td>`).join('')}
+    <td class="num" id="vp-t-q"></td><td class="num" id="vp-t-s"></td><td class="num" id="vp-t-b"></td><td class="num" id="vp-t-p"></td><td class="num" id="vp-t-r"></td><td class="num" id="vp-t-a"></td><td class="num" id="vp-t-ar"></td><td></td></tr>`;
+  const st = wrap.scrollTop, sl = wrap.scrollLeft;
+  wrap.innerHTML = `<table class="vp-table"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+  // 왼쪽 고정 열(업체·품목코드·Spec) 위치를 실제 너비로 맞춤
+  const th = wrap.querySelectorAll('thead th[data-sl]');
+  const w0 = th[0].offsetWidth, w1 = th[1].offsetWidth;
+  wrap.querySelectorAll('[data-sl="1"]').forEach(e => e.style.left = w0 + 'px');
+  wrap.querySelectorAll('[data-sl="2"]').forEach(e => e.style.left = (w0 + w1) + 'px');
+  wrap.scrollTop = st; wrap.scrollLeft = sl;
+  wrap.querySelector('tbody').addEventListener('change', vpOnInput);
+  wrap.querySelector('tbody').addEventListener('keydown', vpOnKey);
+  vpUpdateTotals();
+}
+
+/* 입력 → 값 반영 + 저장 예약 + 합계 갱신 (표를 다시 그리지 않아 입력 포커스 유지) */
+function vpOnInput(e) {
+  const inp = e.target; if(inp.tagName !== 'INPUT') return;
+  const tr = inp.closest('tr[data-id]'); if(!tr) return;
+  const r = window._vp.rows[tr.dataset.id]; if(!r) return;
+  const f = inp.dataset.f;
+  if(f[0] === 'q' && f !== 'q') {
+    const i = parseInt(f.slice(1)); r.qty = r.qty || new Array(12).fill(0);
+    r.qty[i] = vpNum(inp.value); inp.value = r.qty[i] || '';
+  } else if(f === 'sell' || f === 'buy') { r[f] = vpNum(inp.value); }
+  else { r[f] = inp.value.trim(); }
+  vpMarkDirty(r.id);
+  if(f === 'code' || f === 'spec' || f === 'customer') {
+    const lk = tr.querySelector('.vp-nolink'), it = vpLinkItem(r);
+    if(it && lk) lk.remove();
+  }
+  vpUpdateTotals();
+}
+/* 엔터 = 아래 칸, 화살표 위/아래 이동 */
+function vpOnKey(e) {
+  if(!['Enter','ArrowDown','ArrowUp'].includes(e.key)) return;
+  const inp = e.target; if(inp.tagName !== 'INPUT') return;
+  const tr = inp.closest('tr'); const f = inp.dataset.f;
+  let t = tr;
+  do { t = (e.key === 'ArrowUp') ? t.previousElementSibling : t.nextElementSibling; } while(t && !t.dataset.id);
+  if(!t) return;
+  const nx = t.querySelector(`input[data-f="${f}"]`);
+  if(nx) { e.preventDefault(); inp.dispatchEvent(new Event('change', {bubbles:true})); nx.focus(); nx.select(); }
+}
+
+function vpCalc(list, year, acts) {
+  const t = { m: new Array(12).fill(0), q:0, s:0, b:0, a:0, aPlanSameRows:0 };
+  list.forEach(r => {
+    const qs = (r.qty||[]).map(vpNum);
+    qs.forEach((v,i)=> t.m[i] += v);
+    const q = qs.reduce((a,b)=>a+b,0);
+    t.q += q; t.s += q * vpNum(r.sell); t.b += q * vpNum(r.buy);
+    const act = (acts && acts.get(r.id)) || vpActual(r, year);
+    if(act.linked) { t.a += act.total; t.aPlanSameRows += q; }
+  });
+  t.p = t.s - t.b; t.r = t.s ? t.p / t.s * 100 : 0;
+  return t;
+}
+function vpUpdateTotals() {
+  const V = window._vp, year = V.year;
+  const set = (id, v) => { const el = document.getElementById(id); if(el) el.textContent = v; };
+  const setP = (id, p) => { const el = document.getElementById(id); if(el) { el.textContent = p ? vpFmt(p) : '—'; el.style.color = p < 0 ? 'var(--red)' : ''; } };
+  const rows = vpFiltered();
+  const acts = new Map(rows.map(r => [r.id, vpActual(r, year)]));   // 실적은 한 번만 계산
+  // 행
+  rows.forEach(r => {
+    const act = acts.get(r.id), t = vpCalc([r], year, acts);
+    set(`vp-r${r.id}-q`, vpFmt(t.q)); set(`vp-r${r.id}-s`, vpFmt(t.s)); set(`vp-r${r.id}-b`, vpFmt(t.b)); setP(`vp-r${r.id}-p`, t.p);
+    set(`vp-r${r.id}-r`, t.s ? t.r.toFixed(1)+'%' : '—');
+    set(`vp-r${r.id}-a`, act.linked ? vpFmt(act.total) || '0' : '—');
+    set(`vp-r${r.id}-ar`, act.linked && t.q ? Math.round(act.total / t.q * 100) + '%' : '—');
+  });
+  // 그룹
+  const byG = new Map(); rows.forEach(r => { if(!byG.has(r._g)) byG.set(r._g, []); byG.get(r._g).push(r); });
+  byG.forEach((list, g) => {
+    const t = vpCalc(list, year, acts);
+    VP_MONTHS.forEach((m,i)=> set(`vp-g${g}-m${m}`, vpFmt(t.m[i])));
+    set(`vp-g${g}-q`, vpFmt(t.q)); set(`vp-g${g}-s`, vpFmt(t.s)); set(`vp-g${g}-b`, vpFmt(t.b)); setP(`vp-g${g}-p`, t.p);
+    set(`vp-g${g}-r`, t.s ? t.r.toFixed(1)+'%' : '—'); set(`vp-g${g}-a`, vpFmt(t.a));
+  });
+  // 합계
+  const T = vpCalc(rows, year, acts);
+  VP_MONTHS.forEach((m,i)=> set(`vp-t-m${m}`, vpFmt(T.m[i])));
+  set('vp-t-q', vpFmt(T.q)); set('vp-t-s', vpFmt(T.s)); set('vp-t-b', vpFmt(T.b)); setP('vp-t-p', T.p);
+  set('vp-t-r', T.s ? T.r.toFixed(1)+'%' : '—'); set('vp-t-a', vpFmt(T.a));
+  set('vp-t-ar', T.aPlanSameRows ? Math.round(T.a / T.aPlanSameRows * 100) + '%' : '—');
+  // 카드
+  set('vp-m-label-s', `${year}년 계획 매출`);
+  set('vp-m-sales', vpWon(T.s)); set('vp-m-buy', vpWon(T.b));
+  const pe = document.getElementById('vp-m-profit'); if(pe) { pe.textContent = vpWon(T.p); pe.style.color = T.p >= 0 ? 'var(--blue)' : 'var(--red)'; }
+  set('vp-m-profit-sub', `이익률 ${T.s ? T.r.toFixed(1) : 0}% · 연간 ${vpFmt(T.q)||0}개`);
+  set('vp-m-actual', T.a ? vpFmt(T.a) + '개' : '0개');
+  set('vp-m-actual-sub', T.aPlanSameRows ? `계획 ${vpFmt(T.aPlanSameRows)}개 대비 ${Math.round(T.a / T.aPlanSameRows * 100)}% (품목 연결된 행 기준)` : '품목 연결된 행의 같은 연도 출고');
+  // 분기
+  const qs = [0,1,2,3].map(k => {
+    const t = { q:0, s:0, b:0 };
+    rows.forEach(r => { for(let i=k*3;i<k*3+3;i++){ const v = vpNum((r.qty||[])[i]); t.q += v; t.s += v*vpNum(r.sell); t.b += v*vpNum(r.buy); } });
+    t.p = t.s - t.b; return t;
+  });
+  const qEl = document.getElementById('vp-quarter');
+  if(qEl) qEl.innerHTML = `<table class="pt-table"><thead><tr><th></th>${qs.map((_,k)=>`<th class="num">${k+1}분기</th>`).join('')}<th class="num">연간</th></tr></thead><tbody>
+    <tr><td>수량</td>${qs.map(t=>`<td class="num">${vpFmt(t.q)}</td>`).join('')}<td class="num"><b>${vpFmt(T.q)}</b></td></tr>
+    <tr><td>매출</td>${qs.map(t=>`<td class="num" style="color:var(--green)">${vpFmt(t.s)}</td>`).join('')}<td class="num" style="color:var(--green)"><b>${vpFmt(T.s)}</b></td></tr>
+    <tr><td>매입</td>${qs.map(t=>`<td class="num" style="color:var(--red)">${vpFmt(t.b)}</td>`).join('')}<td class="num" style="color:var(--red)"><b>${vpFmt(T.b)}</b></td></tr>
+    <tr><td>이익</td>${qs.map(t=>`<td class="num" style="color:var(--blue)">${vpFmt(t.p)}</td>`).join('')}<td class="num" style="color:var(--blue)"><b>${vpFmt(T.p)}</b></td></tr>
+    <tr><td>이익률</td>${qs.map(t=>`<td class="num">${t.s?(t.p/t.s*100).toFixed(1)+'%':'—'}</td>`).join('')}<td class="num"><b>${T.s?T.r.toFixed(1)+'%':'—'}</b></td></tr>
+  </tbody></table><div style="font-size:11px;color:var(--text3);margin-top:6px;">위 표의 검색·카테고리 조건이 그대로 적용됩니다. 금액 단위: 원</div>`;
+}
+
+/* 저장 (행 단위 merge, 0.8초 모아서) */
+function vpMarkDirty(id) {
+  const V = window._vp; V.dirty.add(id);
+  const st = document.getElementById('vp-save-state'); if(st) st.textContent = '저장 대기...';
+  clearTimeout(V.timer); V.timer = setTimeout(vpFlush, 800);
+}
+async function vpFlush() {
+  const V = window._vp; clearTimeout(V.timer);
+  if(!V.dirty.size || !V.year) return;
+  const ids = [...V.dirty]; V.dirty.clear();
+  const rows = {}; ids.forEach(id => { const r = Object.assign({}, V.rows[id]); delete r._g; rows[id] = r; });
+  const st = document.getElementById('vp-save-state'); if(st) st.textContent = '저장 중...';
+  try {
+    await window._db_setSetting('volume-plan-' + V.year, { rows, updatedAt: new Date().toISOString(), updatedBy: getCurrentUserLabel() });
+    if(st) st.textContent = '✓ 저장됨 ' + new Date().toTimeString().slice(0,5);
+  } catch(e) {
+    ids.forEach(id => V.dirty.add(id));
+    if(st) st.textContent = '⚠ 저장 실패 — 다시 시도 중';
+    V.timer = setTimeout(vpFlush, 5000);
+  }
+}
+window.addEventListener('beforeunload', e => { if(window._vp.dirty.size) { vpFlush(); e.preventDefault(); e.returnValue = ''; } });
+
+/* ── 등록 품목 기준 자동 생성 ──
+   품목마다 하위 행 = 업체. 업체 출처: ① 업체별 단가(매출) 등록 업체 ② 최근 1년 출고 이력의 업체
+   판매가: 업체별 매출 단가 → 그 업체 최근 출고 단가 → 품목 LG인정가 / 구매가: 품목 입고단가 (USD는 원화 환산) */
+async function generateVolPlanFromItems() {
+  const V = window._vp; if(!V.loaded) await openVolPlanTab();
+  if(!window._partnerAliases) await loadPartnerAliases();
+  const items = getItems().filter(i => i.code && !/물류비/.test(i.code + i.name));
+  if(!items.length) { showToast('⚠ 등록된 품목이 없습니다.'); return; }
+  const customers = getCustomers();
+  const canon = name => {               // 등록 거래처 이름으로 통일
+    if(!name) return '';
+    const alias = (window._partnerAliases||{})[name]; if(alias) return alias;
+    if(customers.some(c => c.name === name)) return name;
+    const { pick } = customers.length ? _pmCandidates(name, customers) : {};
+    return pick && (pick.why === '일치' || pick.why === '포함') ? pick.name : name;
+  };
+  const krw = (amount, currency, date) => {      // 단가는 반올림 없이 환산 (USD 소수 단가 보존)
+    if((currency||'KRW') !== 'USD') return amount||0;
+    const rate = (window._fxCache||{})[getPrevMonthYm(date||TODAY)] || Object.entries(window._fxCache||{}).sort().pop()?.[1] || 0;
+    return rate ? (amount||0) * rate : 0;
+  };
+  const since = _finAddDays(TODAY, -365);
+  const lastYear = String(parseInt(V.year) - 1);
+  const hist = getHistory().filter(h => h.type === 'out');
+  const plan = [];
+  items.forEach(it => {
+    const custMap = new Map();         // norm → { name, sell, src }
+    const addC = (name, sell, src) => {
+      const nm = canon(String(name||'').trim()); if(!nm) return;
+      const k = _pmNorm(nm); if(!k) return;
+      if(!custMap.has(k)) custMap.set(k, { name: nm, sell: sell || 0, src });
+      else if(!custMap.get(k).sell && sell) custMap.get(k).sell = sell;
+    };
+    getPrices().filter(p => p.itemName === it.name && p.type === '매출' && p.partner).forEach(p => {
+      const pp = getPartnerPrice(it.name, p.partner, '매출', TODAY);
+      addC(p.partner, pp ? krw(pp.price, pp.currency, TODAY) : 0, '단가');
+    });
+    hist.filter(h => h.itemName === it.name && h.partner && h.date >= since)
+      .sort((a,b) => String(b.date).localeCompare(String(a.date)))
+      .forEach(h => addC(h.partner, h.price ? krw(h.price, getCurrency(h), h.date) : 0, '출고'));
+    const buy = it.buyPrice ? krw(it.buyPrice, it.buyCurrency, TODAY) : 0;
+    const lg  = it.sellPrice ? krw(it.sellPrice, it.sellCurrency, TODAY) : 0;
+    const custs = [...custMap.values()].sort((a,b) => a.name.localeCompare(b.name,'ko'));
+    if(!custs.length) custs.push({ name: '', sell: 0, src: '' });
+    custs.forEach(c => {
+      // 작년 같은 달 출고 수량 (기본값 선택 시 사용)
+      const cn = _pmNorm(c.name);
+      const ly = new Array(12).fill(0);
+      if(cn) hist.forEach(h => {
+        if(h.itemName !== it.name || !String(h.date).startsWith(lastYear + '-')) return;
+        const pn = _pmNorm(canon(h.partner)); if(pn !== cn) return;
+        ly[parseInt(String(h.date).slice(5,7)) - 1] += Number(h.qty)||0;
+      });
+      plan.push({ it, cust: c.name, sell: Math.round((c.sell || lg) * 1000) / 1000, buy: Math.round(buy * 1000) / 1000, ly });
+    });
+  });
+  // 이미 있는 (업체 + 품목) 행은 건너뜀
+  const have = new Set(vpRowsList().map(r => _pmNorm(r.customer) + '|' + (vpLinkItem(r)||{}).code));
+  const todo = plan.filter(p => !have.has(_pmNorm(p.cust) + '|' + p.it.code));
+  const nItems = new Set(todo.map(p => p.it.code)).size;
+  if(!todo.length) { showToast('추가할 행이 없습니다. (등록 품목·업체가 이미 모두 들어 있음)'); return; }
+  const lyRows = todo.filter(p => p.ly.some(v => v)).length;
+  if(!confirm(`품목 ${nItems}개 · 업체 행 ${todo.length}개를 ${V.year}년 계획에 추가합니다.\n(이미 있는 업체·품목 ${plan.length - todo.length}행은 건너뜀)\n\n업체 = 업체별 단가(매출) 등록 업체 + 최근 1년 출고 업체\n판매가 = 업체별 단가 → 최근 출고 단가 → LG인정가 / 구매가 = 입고단가`)) return;
+  const fillLY = lyRows > 0 && confirm(`${lastYear}년 같은 달 출고 수량이 있는 행이 ${lyRows}개 있습니다.\n이 수량을 ${V.year}년 예상 수량의 기본값으로 채울까요?\n\n(확인 = 작년 실적으로 채움 / 취소 = 수량은 비워 둠)`);
+  let order = Math.max(0, ...vpRowsList().map(r => r.order||0));
+  todo.sort((a,b) => String(a.it.typeName||'').localeCompare(String(b.it.typeName||''),'ko') || a.it.code.localeCompare(b.it.code) || a.cust.localeCompare(b.cust,'ko'));
+  todo.forEach(p => {
+    const r = { id: vpNewId(), cat: p.it.typeName || '', customer: p.cust, code: p.it.code, spec: p.it.name,
+      sell: p.sell, buy: p.buy, qty: fillLY ? p.ly.slice() : new Array(12).fill(0), order: ++order, src: 'items' };
+    V.rows[r.id] = r; vpMarkDirty(r.id);
+  });
+  await vpFlush();
+  V.group = 'part';
+  renderVolPlan();
+  showToast(`✓ 품목 ${nItems}개 · 업체 행 ${todo.length}개를 추가했습니다${fillLY ? ' (작년 실적 수량으로 채움)' : ''}.`);
+}
+
+/* 연도 계획 전체 삭제 (직전 내용은 volume-plan-YYYY-backup 에 보관 → 되돌리기 가능) */
+async function clearVolPlan() {
+  const V = window._vp; if(!V.loaded) return;
+  const n = vpRowsList().length;
+  if(!n) { showToast('지울 행이 없습니다.'); return; }
+  if(!confirm(`${V.year}년 물동량 계획 ${n}행을 모두 지울까요?\n\n입력해 둔 월별 수량도 함께 지워집니다.\n(직전 내용은 보관되어, 빈 화면의 '되돌리기'로 복구할 수 있습니다)`)) return;
+  await vpFlush();
+  try {
+    const keep = {}; vpRowsList().forEach(r => { const c = Object.assign({}, r); delete c._g; keep[r.id] = c; });
+    await window._db_replaceSetting('volume-plan-' + V.year + '-backup', { rows: keep, savedAt: new Date().toISOString(), savedBy: getCurrentUserLabel() });
+    await window._db_replaceSetting('volume-plan-' + V.year, { rows: {}, clearedAt: new Date().toISOString(), clearedBy: getCurrentUserLabel() });
+    V.rows = {}; V.dirty.clear();
+    renderVolPlan();
+    showToast(`✓ ${V.year}년 물동량 계획 ${n}행을 지웠습니다.`);
+  } catch(e) { console.error(e); showToast('⚠ 삭제 실패: ' + (e.message || e)); }
+}
+async function vpShowRestore() {
+  const V = window._vp, box = document.getElementById('vp-restore-box'); if(!box) return;
+  try {
+    const b = await window._db_getSetting('volume-plan-' + V.year + '-backup');
+    const n = b && b.rows ? Object.values(b.rows).filter(r => r && !r.deleted).length : 0;
+    if(n) box.innerHTML = `<button class="btn btn-secondary btn-sm" onclick="restoreVolPlan()">↩ 직전에 지운 ${n}행 되돌리기</button> <span style="font-size:11px;color:var(--text3)">(${String(b.savedAt||'').slice(0,16).replace('T',' ')} 삭제)</span>`;
+  } catch(e) {}
+}
+async function restoreVolPlan() {
+  const V = window._vp;
+  const b = await window._db_getSetting('volume-plan-' + V.year + '-backup');
+  if(!b || !b.rows) { showToast('되돌릴 내용이 없습니다.'); return; }
+  if(!confirm(`직전에 지운 ${V.year}년 물동량 계획을 되돌릴까요?`)) return;
+  await window._db_replaceSetting('volume-plan-' + V.year, { rows: b.rows, restoredAt: new Date().toISOString(), restoredBy: getCurrentUserLabel() });
+  V.rows = b.rows; renderVolPlan();
+  showToast('✓ 되돌렸습니다.');
+}
+
+function vpNewId() { return 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2,6); }
+function addVolPlanRow() {
+  const V = window._vp; if(!V.loaded) return;
+  const minOrder = Math.min(0, ...vpRowsList().map(r => r.order||0));
+  const cat = (document.getElementById('vp-cat')||{}).value || '';
+  const r = { id: vpNewId(), cat, customer:'', code:'', spec:'', sell:0, buy:0, qty:new Array(12).fill(0), order: minOrder - 1 };
+  V.rows[r.id] = r; vpMarkDirty(r.id);
+  document.getElementById('vp-search').value = '';
+  renderVolPlan();
+  const inp = document.querySelector(`#vp-table-wrap tr[data-id="${r.id}"] input[data-f="customer"]`);
+  if(inp) { inp.scrollIntoView({block:'center'}); inp.focus(); }
+}
+function deleteVolPlanRow(id) {
+  const r = window._vp.rows[id]; if(!r) return;
+  if(!confirm(`이 행을 삭제할까요?\n\n${r.customer||'(업체 없음)'} · ${r.code||''} ${String(r.spec||'').split('\n')[0]}`)) return;
+  r.deleted = true; vpMarkDirty(id); renderVolPlan();
+}
+
+/* ── 물동량 엑셀(.xls/.xlsx) 불러오기 ──
+   형식: 'Customer | LG part number | Specification | Selling | Buying | 구분(수량/판매가/구매가/매출이익) | 1월..12월(분기 소계 포함) | 합계'
+   업체·품목코드 위치가 섹션마다 달라도(A/B/C열) 코드 모양과 텍스트로 구분 */
+const VP_CODE_RE = /^(?:E[A-Z]{2}[0-9A-Z]{6,10}|0CK\d{6,10}|62\d{2}(?=[0-9A-Z]*[A-Z])[0-9A-Z]{6,8})$/;
+function vpTokens(s) { return String(s==null?'':s).replace(/_x000D_/g,'').split(/[\s()\[\],]+/).map(t=>t.trim()).filter(Boolean); }
+function vpFindCode(s) { const t = vpTokens(s).find(t => VP_CODE_RE.test(t.toUpperCase())); return t ? t.toUpperCase() : ''; }
+function vpIsText(s) { const v = String(s==null?'':s).trim(); return v && !vpFindCode(v) && isNaN(Number(v)); }
+
+function vpParseSheet(aoa) {
+  // 헤더 행: '구분' 열과 월 열 찾기
+  let hr = -1, colF = -1, monthCol = {};
+  for(let i=0;i<Math.min(15,aoa.length);i++){
+    const row = aoa[i]||[];
+    const fi = row.findIndex(v => String(v||'').replace(/\s/g,'') === '구분');
+    if(fi >= 0) {
+      row.forEach((v,ci)=>{ const m = String(v||'').replace(/\s/g,'').match(/^(\d{1,2})월$/); if(m) monthCol[parseInt(m[1])] = ci; });
+      if(Object.keys(monthCol).length >= 12) { hr = i; colF = fi; break; }
+    }
+  }
+  if(hr < 0) return null;
+  let year = null;
+  for(let i=0;i<=hr;i++) (aoa[i]||[]).forEach(v=>{ const m = String(v||'').match(/(20\d{2})\s*년\s*물/); if(m && !year) year = m[1]; });
+  const cell = (r,c) => (aoa[r]||[])[c];
+  const blocks = [], labels = [];
+  let customer = '';
+  for(let r=hr+1; r<aoa.length; r++){
+    const kind = String(cell(r,colF)||'').replace(/\s/g,'');
+    if(kind !== '수량') continue;
+    const A = cell(r,0), B = cell(r,1), C = cell(r,2), D = cell(r,3), E = cell(r,4);
+    const aTxt = String(A==null?'':A).replace(/\s+/g,' ').trim();
+    const isPrice = v => v !== null && v !== '' && !isNaN(Number(v));
+    // 소계·합계 행 (단가 없음 + A열 라벨) → 카테고리 표시 및 업체 리셋
+    if(!isPrice(D) && !isPrice(E) && !vpFindCode(A) && !vpFindCode(B) && !vpFindCode(C) && !vpIsText(B) && !String(C||'').trim()) {
+      if(aTxt) labels.push({ r, label: aTxt });
+      customer = ''; continue;
+    }
+    const code = vpFindCode(A) || vpFindCode(B) || vpFindCode(C);
+    if(vpIsText(B)) customer = String(B).replace(/\s+/g,' ').trim();
+    else if(vpIsText(A)) customer = aTxt;
+    let spec = String(C==null?'':C).replace(/_x000D_/g,'').split('\n').map(s=>s.trim()).filter(s => s && s.toUpperCase() !== code).join(' ');
+    if(!spec && vpIsText(C)) spec = String(C).trim();
+    const qty = VP_MONTHS.map(m => { const v = cell(r, monthCol[m]); const n = Number(v); return isFinite(n) && v !== '' && v !== null ? n : 0; });
+    blocks.push({ r, customer, code, spec, sell: isPrice(D) ? Number(D) : 0, buy: isPrice(E) ? Number(E) : 0, qty });
+  }
+  // 카테고리: 블록 다음에 오는 '소계'가 아닌 합계 라벨
+  const clean = s => s.replace(/소계|합계/g,'').replace(/부품/g,'').replace(/\s+/g,' ').trim();
+  blocks.forEach(b => {
+    const lb = labels.find(l => l.r > b.r && clean(l.label));
+    b.cat = lb ? clean(lb.label) : '';
+  });
+  return { year, blocks };
+}
+
+async function importVolPlanExcel(input) {
+  const files = [...(input.files||[])]; input.value = '';
+  if(!files.length) return;
+  if(typeof XLSX === 'undefined') { showToast('⚠ 엑셀 라이브러리 로딩 중입니다. 잠시 후 다시 시도하세요.'); return; }
+  const V = window._vp; if(!V.loaded) await openVolPlanTab();
+  let all = [], years = new Set(), sheetsUsed = [];
+  for(const f of files) {
+    const wb = XLSX.read(new Uint8Array(await f.arrayBuffer()), {type:'array'});
+    wb.SheetNames.forEach((sn, idx) => {
+      const hidden = wb.Workbook && wb.Workbook.Sheets && wb.Workbook.Sheets[idx] && wb.Workbook.Sheets[idx].Hidden;
+      if(hidden || !sn.includes('물동량')) return;
+      const res = vpParseSheet(XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, defval:null, blankrows:true}));
+      if(!res || !res.blocks.length) return;
+      if(res.year) years.add(res.year);
+      sheetsUsed.push(`${f.name} › ${sn} (${res.blocks.length}행)`);
+      all = all.concat(res.blocks);
+    });
+  }
+  if(!all.length) { showToast('⚠ 물동량 시트를 찾지 못했습니다. (구분·1월~12월 머리글이 있는 시트)'); return; }
+  const fileYear = [...years][0];
+  if(fileYear && fileYear !== V.year) {
+    if(confirm(`파일은 ${fileYear}년 물동량입니다. ${fileYear}년 계획으로 불러올까요?\n(취소하면 지금 보고 있는 ${V.year}년에 넣습니다)`)) {
+      const ysel = document.getElementById('vp-year');
+      if(![...ysel.options].some(o=>o.value===fileYear)) ysel.insertAdjacentHTML('beforeend', `<option value="${fileYear}">${fileYear}년</option>`);
+      ysel.value = fileYear; await openVolPlanTab();
+    }
+  }
+  // 같은 업체 + 품목코드(없으면 Spec) 행은 갱신, 없으면 추가
+  const keyOf = r => _pmNorm(r.customer) + '|' + (r.code || _pmNorm(r.spec));
+  const existing = new Map(vpRowsList().map(r => [keyOf(r), r]));
+  const hasQty = all.filter(b => b.qty.some(v=>v)).length;
+  let upd = 0, add = 0;
+  const msg = `불러올 시트:\n${sheetsUsed.join('\n')}\n\n총 ${all.length}행 (수량이 들어 있는 행 ${hasQty}개)\n\n같은 업체·품목은 판매가·구매가·카테고리를 엑셀 값으로 바꾸고,\n월 수량은 엑셀에 수량이 있는 경우에만 덮어씁니다. 진행할까요?`;
+  if(!confirm(msg)) return;
+  let order = Math.max(0, ...vpRowsList().map(r=>r.order||0));
+  const seen = new Map();
+  all.forEach(b => {
+    let k = keyOf(b);
+    const n = (seen.get(k)||0) + 1; seen.set(k, n);
+    if(n > 1) k += '#' + n;       // 같은 업체·품목이 시트에 두 번 있으면 별도 행
+    const ex = existing.get(k);
+    if(ex) {
+      Object.assign(ex, { cat: b.cat || ex.cat, sell: b.sell || ex.sell, buy: b.buy || ex.buy, spec: b.spec || ex.spec });
+      if(b.qty.some(v=>v)) ex.qty = b.qty;
+      vpMarkDirty(ex.id); upd++;
+    } else {
+      const r = { id: vpNewId(), cat: b.cat, customer: b.customer, code: b.code, spec: b.spec, sell: b.sell, buy: b.buy, qty: b.qty, order: ++order };
+      V.rows[r.id] = r; existing.set(k, r); vpMarkDirty(r.id); add++;
+    }
+  });
+  await vpFlush();
+  renderVolPlan();
+  showToast(`✓ 물동량 불러오기 완료: 추가 ${add}행 · 갱신 ${upd}행`);
+}
+
+function exportVolPlanExcel() {
+  if(typeof XLSX === 'undefined') { showToast('⚠ 엑셀 라이브러리를 불러오지 못했습니다.'); return; }
+  const rows = vpFiltered(), year = window._vp.year;
+  const head = ['카테고리','업체','품목코드','Spec','판매가','구매가', ...VP_MONTHS.map(m=>m+'월'), '연간수량','매출','매입','이익','이익률'];
+  const ws = XLSX.utils.aoa_to_sheet([head]);
+  const col = i => XLSX.utils.encode_col(i);
+  rows.forEach((r, k) => {
+    const R = k + 2;
+    const vals = [r.cat||'', r.customer||'', r.code||'', String(r.spec||'').replace(/\n/g,' '), vpNum(r.sell), vpNum(r.buy), ...VP_MONTHS.map((m,i)=>vpNum((r.qty||[])[i]))];
+    vals.forEach((v,i) => { ws[col(i)+R] = typeof v === 'number' ? {t:'n', v} : {t:'s', v}; });
+    const q = vpQtySum(r), s = q*vpNum(r.sell), b = q*vpNum(r.buy);
+    ws[col(18)+R] = {t:'n', f:`SUM(G${R}:R${R})`, v:q};
+    ws[col(19)+R] = {t:'n', f:`S${R}*E${R}`, v:s};
+    ws[col(20)+R] = {t:'n', f:`S${R}*F${R}`, v:b};
+    ws[col(21)+R] = {t:'n', f:`T${R}-U${R}`, v:s-b};
+    ws[col(22)+R] = {t:'n', f:`IF(T${R}=0,0,V${R}/T${R})`, v:s?(s-b)/s:0, z:'0.0%'};
+  });
+  const TR = rows.length + 2;
+  ws['A'+TR] = {t:'s', v:'합계'};
+  for(let i=6;i<=21;i++) ws[col(i)+TR] = {t:'n', f:`SUM(${col(i)}2:${col(i)}${TR-1})`, v:0};
+  ws[col(22)+TR] = {t:'n', f:`IF(T${TR}=0,0,V${TR}/T${TR})`, v:0, z:'0.0%'};
+  ws['!ref'] = `A1:${col(22)}${TR}`;
+  ws['!cols'] = head.map((h,i)=>({wch: i===3?28 : i<3?14 : 10}));
+  const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, `${year} 물동량 계획`);
+  XLSX.writeFile(wb, `${year}_물동량계획_${TODAY.replace(/-/g,'')}.xlsx`);
+}
+
 function exportPriceTableExcel() {
   if(typeof XLSX === 'undefined') { showToast('⚠ 엑셀 라이브러리를 불러오지 못했습니다.'); return; }
   const { rows, cols } = _ptBuildData();
@@ -4034,7 +4671,7 @@ function renderHistory() {
       <td style="font-weight:600;color:${h.type==='in'?'var(--green)':'var(--red)'}">${h.amount?(h.currency==='USD'?'$'+h.amount.toLocaleString():won(h.amount)):'—'}</td>
       <td>${h.partner||'—'}</td>
       <td style="text-align:center;">${bmDisp}</td>
-      <td class="mono">${h.afterStock.toLocaleString()}</td>
+      <td class="mono" title="날짜순으로 계산한 그 시점 재고">${runStockOf(h).toLocaleString()}</td>
       <td style="color:var(--text3)">${h.note||'—'}</td>
       <td style="font-size:11px;color:var(--text3)">${h.createdBy||h.updatedBy||'—'}</td>
       <td><div style="display:flex;gap:3px;flex-wrap:wrap;">
@@ -4679,7 +5316,7 @@ function printFromHistory(id) {
     note:       h.note || '',
     billMonth:  h.billMonth || '',
     currency:   h.currency || 'KRW',
-    afterStock: h.afterStock,
+    afterStock: runStockOf(h),
     code:       item ? item.code : '',
     cat:        item ? item.cat  : '',
     maker:      item ? item.maker : '',
@@ -5251,7 +5888,7 @@ function exportCSV() {
   const rows=[['일자','유형','품목코드','품목명','수량','단가','금액','거래처','처리후재고','비고']];
   getHistory().forEach(h=>{
     const item=getItem(h.itemName);
-    rows.push([h.date,h.type==='in'?'입고':'출고',item?item.code:'',h.itemName,h.qty,h.price||0,h.amount||0,h.partner||'',h.afterStock,h.note||'']);
+    rows.push([h.date,h.type==='in'?'입고':'출고',item?item.code:'',h.itemName,h.qty,h.price||0,h.amount||0,h.partner||'',runStockOf(h),h.note||'']);
   });
   const csv='\uFEFF'+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),download:`입출고내역_${TODAY}.csv`});
@@ -5297,7 +5934,7 @@ function exportHistoryCSV() {
   const rows=[['일자','유형','품목코드','품목명','Maker','수량','단가','금액','거래처','처리후재고','비고']];
   sorted.forEach(h=>{
     const item=getItem(h.itemName);
-    rows.push([h.date,h.type==='in'?'입고':'출고',item?item.code:'',h.itemName,item?(item.maker||''):'',h.qty,h.price||0,h.amount||0,h.partner||'',h.afterStock,h.note||'']);
+    rows.push([h.date,h.type==='in'?'입고':'출고',item?item.code:'',h.itemName,item?(item.maker||''):'',h.qty,h.price||0,h.amount||0,h.partner||'',runStockOf(h),h.note||'']);
   });
   const csv='\uFEFF'+rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
   const a=Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),download:`입출고내역_필터_${TODAY}.csv`});
@@ -5375,7 +6012,7 @@ function exportHistoryXLSX() {
       h.price || 0,
       h.amount || 0,
       h.partner || '',
-      h.afterStock,
+      runStockOf(h),
       h.note || ''
     ]);
   });
