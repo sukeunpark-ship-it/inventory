@@ -104,6 +104,9 @@
     if(histFixBtn) histFixBtn.style.display = isSuperAdmin ? '' : 'none';
     const histMatchBtn = document.getElementById('hist-match-partner-btn');
     if(histMatchBtn) histMatchBtn.style.display = isSuperAdmin ? '' : 'none';
+    // 수출 서류(Invoice / PL): 최고 관리자만 표시
+    ['nav-section-invoice','nav-invoice'].forEach(id => { const el = document.getElementById(id); if(el) el.style.display = isSuperAdmin ? '' : 'none'; });
+    window._isSuperAdmin = isSuperAdmin;
     const stockAlignBtn = document.getElementById('stock-align-btn');
     if(stockAlignBtn) stockAlignBtn.style.display = isSuperAdmin ? '' : 'none';
     // 품목 엑셀 일괄 등록 버튼: 최고 관리자만 표시
@@ -828,8 +831,8 @@ textarea.form-control{min-height:64px;resize:vertical;}
       <div class="nav-item" onclick="showTab('stockalert')" id="nav-stockalert" style="display:none"><span class="icon">🔔</span> 재고 부족 알림 <span id="alert-badge" class="nav-badge" style="display:none">0</span></div>
       <div class="nav-section">파일 보관함</div>
       <div class="nav-item" onclick="showTab('filevault')" id="nav-filevault"><span class="icon">📁</span> 파일 보관함</div>
-      <div class="nav-section">수출 서류</div>
-      <div class="nav-item" onclick="showTab('invoice')" id="nav-invoice"><span class="icon">📄</span> Invoice / PL 생성</div>
+      <div class="nav-section" id="nav-section-invoice" style="display:none">수출 서류</div>
+      <div class="nav-item" onclick="showTab('invoice')" id="nav-invoice" style="display:none"><span class="icon">📄</span> Invoice / PL 생성</div>
     </nav>
     <div class="sidebar-footer">
       <div class="sync-status">
@@ -954,7 +957,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
               <button id="out-excel-import-btn" class="btn btn-info" onclick="document.getElementById('out-excel-upload').click()" style="display:none;font-size:12px;">📥 엑셀 일괄 등록</button>
               <input type="file" id="out-excel-upload" accept=".xlsx,.xls" style="display:none;" onchange="importOutFromExcel(this)">
               <label id="out-excel-force-label" style="display:none;align-items:center;gap:4px;font-size:11px;color:var(--orange,#e67e22);cursor:pointer;white-space:nowrap;">
-                <input type="checkbox" id="out-excel-force-stock" style="margin:0;"> 재고 무시 등록
+                <input type="checkbox" id="out-excel-force-stock" style="margin:0;" checked> 재고 무시 등록
               </label>
             </div>
           </div>
@@ -2276,7 +2279,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
 /* ── 프로그램 버전 & 새 버전 알림 ──
    GitHub에 새 index.html을 올리면 열려 있는 화면이 5분마다(그리고 창으로 돌아올 때) 확인해서
    상단에 '새 버전' 알림을 띄움 → [지금 적용]을 누르면 새 파일을 받아 바로 적용 (Ctrl+F5 불필요) */
-const APP_VERSION = '2026.11.09-2';
+const APP_VERSION = '2026.11.09-7';
 (function(){
   const lbl = document.getElementById('app-version-label');
   if(lbl) lbl.textContent = '버전 ' + APP_VERSION;
@@ -2619,6 +2622,7 @@ async function withSync(fn) {
 
 /* ── Nav ── */
 function showTab(id) {
+  if(id === 'invoice' && !window._isSuperAdmin) { showToast('⚠ 관리자만 사용할 수 있는 메뉴입니다.'); return; }
   activeTab = id;
   document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
@@ -5013,7 +5017,7 @@ async function saveHistoryEdit() {
   let newStock = item.stock;
   if(type==='in')  newStock = item.stock - oldQty + newQty;
   if(type==='out') newStock = item.stock + oldQty - newQty;
-  if(newStock < 0){ showToast(`⚠ 재고가 부족합니다. (계산 결과: ${newStock})`); return; }
+  if(newStock < 0 && !confirm(`수정하면 재고가 ${newStock.toLocaleString()}(마이너스)가 됩니다.\n그래도 저장할까요?`)) return;
 
   const amount = price * newQty;
   const finType = type==='in' ? '매입' : '매출';
@@ -5056,14 +5060,14 @@ async function deleteHistory(id) {
     let restoredStock = item.stock;
     if(h.type==='in')  restoredStock = item.stock - h.qty; // 입고 삭제 → 재고 감소
     if(h.type==='out') restoredStock = item.stock + h.qty; // 출고 삭제 → 재고 증가
-    if(restoredStock >= 0) {
+    if(restoredStock >= 0 || confirm(`삭제하면 재고가 ${restoredStock.toLocaleString()}(마이너스)가 됩니다.\n그래도 삭제할까요?`)) {
       await withSync(async()=>{
         await window._db_deleteHistory(id);
         await window._db_updateItem(item.code, { stock: restoredStock });
       });
       showToast(`✓ 삭제 완료 — 재고 ${item.stock.toLocaleString()} → ${restoredStock.toLocaleString()}${item.unit}`);
     } else {
-      showToast('⚠ 삭제 시 재고가 음수가 됩니다. 삭제할 수 없습니다.');
+      showToast('삭제를 취소했습니다.');
     }
   } else {
     await withSync(async()=>{ await window._db_deleteHistory(id); });
@@ -5167,7 +5171,10 @@ async function submitOut() {
   }
   const item=getItem(itemName);
   if(!item){showToast('⚠ 품목을 찾을 수 없습니다.');return;}
-  if(qty>0 && item.stock<qty){showToast(`⚠ 재고 부족 (현재: ${item.stock.toLocaleString()}${item.unit})`);return;}
+  // 재고가 모자라도 출고 등록 허용 (한 번 확인 후 재고는 마이너스로 기록)
+  if(qty>0 && item.stock<qty){
+    if(!confirm(`재고가 부족합니다.\n\n현재고 ${item.stock.toLocaleString()}${item.unit} / 출고 ${qty.toLocaleString()}${item.unit}\n등록하면 재고가 ${(item.stock-qty).toLocaleString()}${item.unit}(마이너스)가 됩니다.\n\n그래도 출고 등록할까요?`)) return;
+  }
   // 단가 수동 변경 시 확인
   const priceEl2=document.getElementById('out-price');
   if(priceEl2?._userEdited && dest && price>0) {
@@ -8797,12 +8804,71 @@ const PYO_HOLIDAYS = new Set([
 ]);
 
 const pyoNorm = s => String(s||'').replace(/[\s_\u3000]/g,'').trim();
+/* 거래처명 → 출하1~7 슬롯 (못 찾으면 7 = 출하8)
+   등록 거래처명(예: 주식회사 행성, (주)행성 테크놀러지, ㈜테크노전자, 주식회사 파라콤)과
+   엑셀 표기(행성, 행성테크놀러지, 테크노전자, 파라콤(브라이스톤))가 달라도 같은 회사로 맞춤
+   ① 대량 업로드 때 기억한 매칭(엑셀 이름 → 등록 거래처)  ② (주)·㈜·주식회사·공백·괄호 제거 후 일치
+   ③ 한쪽 이름이 다른 쪽을 포함(가장 긴 슬롯 이름 우선, 예: 테크노전자제2공장 → 테크노전자) */
+const pyoKey = s => String(s||'').toLowerCase()
+  .replace(/\(주\)|㈜|주식회사|유한회사|\(유\)/g,'')
+  .replace(/\([^)]*\)/g,'')            // 괄호 안 설명 제거: 파라콤(브라이스톤) → 파라콤
+  .replace(/[\s_\u3000.,·\-]/g,'');
+function pyoSlotOf(partner) {
+  const p = String(partner||'').trim();
+  if(!p) return 7;
+  const slots = PYO_PARTNERS.slice(0,7);
+  // ① 기억한 매칭 (역방향): 등록 거래처 p 로 바꿨던 엑셀 이름이 슬롯 이름이면 그 슬롯
+  const al = window._partnerAliases || {};
+  for(const [from, to] of Object.entries(al)) {
+    if(to !== p) continue;
+    const k = slots.findIndex(x => pyoKey(x) === pyoKey(from));
+    if(k >= 0) return k;
+  }
+  // ② 정규화 후 일치
+  const pk = pyoKey(p);
+  let k = slots.findIndex(x => pyoKey(x) === pk);
+  if(k >= 0) return k;
+  // ③ 포함 관계 (가장 긴 슬롯 이름)
+  let best = -1, bestLen = 0;
+  slots.forEach((x,i) => { const xk = pyoKey(x); if(xk && (pk.includes(xk) || xk.includes(pk)) && xk.length > bestLen) { best = i; bestLen = xk.length; } });
+  return best >= 0 ? best : 7;
+}
 const pyoCol  = n => { let s=''; while(n>0){ s=String.fromCharCode(65+(n-1)%26)+s; n=Math.floor((n-1)/26); } return s; };
+
+/* 슬롯별로 꼭 이 이름으로 표시할 때 (0부터: 5 = 출하6 테크노전자) */
+const PYO_SLOT_PREFER = { 5: /테크노전자\s*제?\s*2\s*공장/ };
+/* 출하1~7 줄에 표시할 거래처명 = 거래처 관리에 등록된 이름
+   그 슬롯에 해당하는 등록 거래처 중 필름캡 출고가 가장 많은 이름 (없으면 기본 표기 유지)
+   출하8은 슬롯에 없는 거래처 이름들을 모아 표시 */
+function pyoSlotLabels(hist, codeToName) {
+  const names = new Set(PYO_ITEMS.map(x => codeToName[x.code]).filter(Boolean));
+  const reg = new Set(getCustomers().map(c => c.name));
+  const cnt = PYO_PARTNERS.map(() => new Map());
+  hist.forEach(h => {
+    if(h.type !== 'out' || !names.has(h.itemName) || !h.partner) return;
+    const k = pyoSlotOf(h.partner); const m = cnt[k];
+    m.set(h.partner, (m.get(h.partner)||0) + 1);
+  });
+  // 등록 거래처 중 슬롯에 맞는 이름도 후보로 (출고가 아직 없어도 등록 이름으로 표시)
+  getCustomers().forEach(c => { const k = pyoSlotOf(c.name); if(k < 7 && !cnt[k].has(c.name)) cnt[k].set(c.name, 0); });
+  return PYO_PARTNERS.map((p, k) => {
+    const list = [...cnt[k].entries()].sort((a,b) => (reg.has(b[0]) - reg.has(a[0])) || (b[1] - a[1]));
+    if(k === 7) return list.filter(([n,c]) => c > 0).map(([n]) => n).slice(0,3).join(', ');
+    // 슬롯별 고정 표기: 출하6(테크노전자)은 등록 거래처 중 '제2공장' 이름으로만 표시
+    const pref = PYO_SLOT_PREFER[k];
+    if(pref) { const hit = [...reg].find(n => pref.test(n)) || list.map(([n]) => n).find(n => pref.test(n)); if(hit) return hit; }
+    // 같은 줄로 합쳐지는 등록 거래처가 여러 곳이면 함께 표시
+    const used = list.filter(([n,c]) => c > 0).sort((a,b) => b[1]-a[1]).map(([n]) => n);
+    if(used.length > 1) return used.slice(0,2).join(' / ');
+    return list.length ? list[0][0] : p;
+  });
+}
 
 async function exportFilledExcel() {
   if (typeof ExcelJS === 'undefined') { showToast('⚠ 엑셀 라이브러리 로딩 중입니다. 잠시 후 다시 시도하세요.'); return; }
   showToast('📊 엑셀 생성 중...');
   try {
+    if(!window._partnerAliases) { try { await loadPartnerAliases(); } catch(e) {} }
     const items = getItems();
     const hist  = getHistory();
     const fcs   = getForecast().filter(f => f.status !== '완료');
@@ -8821,6 +8887,7 @@ async function exportFilledExcel() {
     const monthList = [...months].sort().reverse(); /* 최신 월이 맨 앞 시트 */
 
     const wb = new ExcelJS.Workbook();
+    window._pyoLabels = pyoSlotLabels(hist, codeToName);
     monthList.forEach(ym => buildPyoSheet(wb, ym, { items, codeToName, hist, fcs, ords }));
 
     const buf  = await wb.xlsx.writeBuffer();
@@ -8927,7 +8994,7 @@ function buildPyoSheet(wb, ym, data) {
 
     const setLbl = (r, cIdx, v, fnt) => { const c = ws.getCell(r, cIdx); c.value = v; c.font = fnt || F8; c.alignment = CTR; };
     setLbl(s, 3, '입고'); setLbl(s, 4, '성호전자=>유니솔렉');
-    PYO_PARTNERS.forEach((p, k) => { setLbl(s+1+k, 3, '출하' + (k+1)); if (p) setLbl(s+1+k, 4, p); });
+    PYO_PARTNERS.forEach((p, k) => { setLbl(s+1+k, 3, '출하' + (k+1)); const lb = (window._pyoLabels||[])[k] || p; if (lb) setLbl(s+1+k, 4, lb); });
     ws.mergeCells('C' + (s+9) + ':C' + (s+10));
     setLbl(s+9, 3, '재고', F8B); setLbl(s+9, 4, '성호전자'); setLbl(s+10, 4, '유니솔렉');
 
@@ -8938,7 +9005,7 @@ function buildPyoSheet(wb, ym, data) {
 
     /* 데이터 집계 (해당 월만) */
     const inMap = {}, outMaps = PYO_PARTNERS.map(() => ({})), fcMaps = PYO_PARTNERS.map(() => ({})), ordMap = {};
-    const slotOf = p => { const n = pyoNorm(p); const k = PYO_PARTNERS.findIndex((x,i) => i < 7 && pyoNorm(x) === n && n !== ''); return k >= 0 ? k : 7; };
+    const slotOf = p => pyoSlotOf(p);
     if (name) {
       data.hist.forEach(h => {
         if (h.itemName !== name || !String(h.date||'').startsWith(pre)) return;
