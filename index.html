@@ -2276,7 +2276,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
 /* ── 프로그램 버전 & 새 버전 알림 ──
    GitHub에 새 index.html을 올리면 열려 있는 화면이 5분마다(그리고 창으로 돌아올 때) 확인해서
    상단에 '새 버전' 알림을 띄움 → [지금 적용]을 누르면 새 파일을 받아 바로 적용 (Ctrl+F5 불필요) */
-const APP_VERSION = '2026.11.09-1';
+const APP_VERSION = '2026.11.09-2';
 (function(){
   const lbl = document.getElementById('app-version-label');
   if(lbl) lbl.textContent = '버전 ' + APP_VERSION;
@@ -2316,7 +2316,21 @@ const APP_VERSION = '2026.11.09-1';
   window._checkNewVersion = checkNewVersion;
 })();
 
-const TODAY = new Date().toISOString().split('T')[0];
+/* 한국 시간(브라우저 지역 시간) 기준 날짜 'YYYY-MM-DD'
+   ※ toISOString()은 세계 표준시(UTC)라 한국 오전 9시 전에는 어제 날짜가 나옴 → 날짜에는 쓰지 않음 */
+function localYmd(d) { d = d || new Date(); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+let TODAY = localYmd(new Date());
+/* 화면을 켜 둔 채 날짜가 바뀌어도(자정 지남) 오늘 날짜를 갱신하고, 입고·출고일자가 어제 날짜로 남아 있으면 오늘로 바꿈 */
+function refreshToday() {
+  const t = localYmd(new Date());
+  if(t === TODAY) return;
+  const old = TODAY; TODAY = t;
+  ['in-date','out-date'].forEach(id => { const el = document.getElementById(id); if(el && (!el.value || el.value === old)) el.value = t; });
+  const side = document.getElementById('today-date-side');
+  if(side) side.textContent = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
+}
+setInterval(refreshToday, 60*1000);
+document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') refreshToday(); });
 document.getElementById('today-date-side').textContent = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
 
 let chartStock=null;
@@ -2917,7 +2931,7 @@ function getLeadtimeAlert(item) {
       켜졌다 꺼졌다 하는 문제가 있어 90일로 통일) */
   const WINDOW_DAYS = 90;
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-WINDOW_DAYS);
-  const cutoffStr = cutoff.toISOString().split('T')[0];
+  const cutoffStr = localYmd(cutoff);
   const totalOut = getHistory()
     .filter(h=>h.type==='out'&&h.itemName===item.name&&h.date>=cutoffStr)
     .reduce((a,b)=>a+(b.qty||0),0);
@@ -3882,7 +3896,7 @@ function calcSafety(itemName) {
   const hist = getHistory().filter(h=>h.type==='out'&&h.itemName===itemName);
   // 기간 필터
   const cutoff = new Date(); cutoff.setDate(cutoff.getDate()-period);
-  const cutoffStr = cutoff.toISOString().split('T')[0];
+  const cutoffStr = localYmd(cutoff);
   const recent = hist.filter(h=>h.date>=cutoffStr);
   if(recent.length===0) return null;
 
@@ -4014,8 +4028,9 @@ function populateSelects() {
     getItems().forEach(i=>sel.innerHTML+=`<option value="${i.name}">${i.code} — ${i.name} (현재고: ${i.stock.toLocaleString()}${i.unit})</option>`);
     sel.value=cur;
   });
-  document.getElementById('in-date').value=TODAY;
-  document.getElementById('out-date').value=TODAY;
+  // 날짜가 비어 있을 때만 오늘로 (사용자가 고른 날짜는 데이터가 갱신돼도 유지)
+  refreshToday();
+  ['in-date','out-date'].forEach(id => { const el = document.getElementById(id); if(el && !el.value) el.value = TODAY; });
   // 출고 공급자 기본값
   const sellerEl=document.getElementById('out-seller');
   if(sellerEl && !sellerEl.value) sellerEl.value='㈜ 유니솔렉';
@@ -4117,11 +4132,11 @@ function setDateRange(preset, doRender=true) {
   } else if(preset === 'lastmonth') {
     const lm = new Date(now.getFullYear(), now.getMonth()-1, 1);
     const lme = new Date(now.getFullYear(), now.getMonth(), 0);
-    from = lm.toISOString().split('T')[0];
-    to   = lme.toISOString().split('T')[0];
+    from = localYmd(lm);
+    to   = localYmd(lme);
   } else if(preset === 'week') {
     const d = new Date(now); d.setDate(now.getDate() - now.getDay() + 1);
-    from = d.toISOString().split('T')[0];
+    from = localYmd(d);
     to   = TODAY;
   } else if(preset === 'clear') {
     from = ''; to = '';
@@ -6011,7 +6026,7 @@ function addItemPriceRow(prefill) {
   const row = document.createElement('div');
   row.id = `ipr-${idx}`;
   row.style.cssText = 'display:grid;grid-template-columns:1fr auto auto 1fr auto auto;gap:8px;align-items:center;background:var(--surface2);border:1px solid var(--border2);border-radius:var(--r);padding:8px 10px;';
-  const today = new Date().toISOString().slice(0,10);
+  const today = localYmd(new Date());
   const pPartner  = prefill ? (prefill.partner||'') : '';
   const pCurrency = prefill ? (prefill.currency||'KRW') : 'KRW';
   const pPrice    = prefill ? (prefill.price||'') : '';
@@ -6371,7 +6386,7 @@ let chartMonthlyOut=null, chartItemMonthly=null;
 
 function getMonths(n) {
   const arr=[];
-  for(let i=n-1;i>=0;i--){const d=new Date();d.setMonth(d.getMonth()-i);arr.push(d.toISOString().slice(0,7));}
+  for(let i=n-1;i>=0;i--){const d=new Date();d.setDate(1);d.setMonth(d.getMonth()-i);arr.push(localYmd(d).slice(0,7));}
   return arr;
 }
 
@@ -6480,7 +6495,7 @@ function setPartnerRange(preset, doRender=true){
   } else if(preset==='lastmonth'){
     const a=new Date(now.getFullYear(), now.getMonth()-1, 1);
     const b=new Date(now.getFullYear(), now.getMonth(), 0);
-    from=a.toISOString().split('T')[0]; to=b.toISOString().split('T')[0];
+    from=localYmd(a); to=localYmd(b);
   } else if(preset==='year'){
     from=`${now.getFullYear()}-01-01`;
   }
@@ -6926,7 +6941,7 @@ function getProfitMonths(){
   }
   const n=parseInt(v)||12;
   const arr=[];
-  for(let i=n-1;i>=0;i--){ const d=new Date(); d.setMonth(d.getMonth()-i); arr.push(d.toISOString().slice(0,7)); }
+  for(let i=n-1;i>=0;i--){ const d=new Date(); d.setDate(1); d.setMonth(d.getMonth()-i); arr.push(localYmd(d).slice(0,7)); }
   return arr;
 }
 
@@ -7416,7 +7431,7 @@ async function seedBuyPriceHistory() {
       itemCode: item.code,
       itemName: item.name,
       maker: item.maker||'',
-      changeDate: (item.createdAt && item.createdAt.toDate ? item.createdAt.toDate().toISOString().slice(0,10) : TODAY),
+      changeDate: (item.createdAt && item.createdAt.toDate ? localYmd(item.createdAt.toDate()) : TODAY),
       applyDate: item.buyPriceDate||'',
       oldPrice: 0,
       newPrice: item.buyPrice||0,
@@ -7505,7 +7520,7 @@ async function seedLgPriceHistory() {
       itemCode: item.code,
       itemName: item.name,
       maker: item.maker||'',
-      changeDate: (item.createdAt && item.createdAt.toDate ? item.createdAt.toDate().toISOString().slice(0,10) : TODAY),
+      changeDate: (item.createdAt && item.createdAt.toDate ? localYmd(item.createdAt.toDate()) : TODAY),
       applyDate: item.sellPriceDate||'',
       oldPrice: 0, newPrice: item.sellPrice||0, changeRate: 0,
       currency: item.sellCurrency||'KRW', reason: '최초등록', changedBy: ''
@@ -7587,7 +7602,7 @@ function renderOrders() {
     if(st&&o.status!==st) return false;
     return true;
   });
-  const thisMonth=new Date().toISOString().slice(0,7);
+  const thisMonth=TODAY.slice(0,7);
   document.getElementById('ord-req').textContent=getOrders().filter(o=>o.status==='발주요청').length;
   document.getElementById('ord-cfm').textContent=getOrders().filter(o=>o.status==='발주확정').length;
   document.getElementById('ord-wait').textContent=getOrders().filter(o=>o.status==='입고대기').length;
@@ -7997,7 +8012,7 @@ function exportPricesToExcel() {
     if(cell){ if(!cell.s)cell.s={}; cell.s.font={bold:true}; }
   });
   XLSX.utils.book_append_sheet(wb,ws,'출고업체별단가');
-  const today=new Date().toISOString().slice(0,10);
+  const today=localYmd(new Date());
   XLSX.writeFile(wb,`출고업체별단가_${today}.xlsx`);
   showToast(`✓ ${prices.length}건 다운로드 완료`);
 }
@@ -10096,7 +10111,7 @@ function renderInvoiceTab() {
   });
   if(cur) sel.value = cur;
   if(!document.getElementById('iv-date').value) {
-    document.getElementById('iv-date').value = new Date().toISOString().slice(0,10);
+    document.getElementById('iv-date').value = localYmd(new Date());
   }
   renderIvItemsTable();
 }
@@ -10151,7 +10166,7 @@ function startNewInvoice() {
   document.getElementById('iv-consignee').value = '';
   document.getElementById('iv-pol').value = 'Busan, Korea';
   document.getElementById('iv-carrier').value = 'By Vessel';
-  document.getElementById('iv-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('iv-date').value = localYmd(new Date());
   const _now = new Date();
   const _mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][_now.getMonth()];
   document.getElementById('iv-sailing').value = `${_mon}. ${_now.getFullYear()}`;
