@@ -889,7 +889,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
       <!-- 재고 현황 -->
       <div class="tab-content" id="tab-inventory">
         <div class="searchbar" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-          <input class="form-control" type="text" placeholder="품목명 또는 코드 검색..." id="inv-search" oninput="renderInventory()" style="flex:1;min-width:160px;">
+          <input class="form-control" type="text" placeholder="품목명·코드·Maker 검색..." id="inv-search" oninput="renderInventory()" style="flex:1;min-width:160px;">
           <select class="form-control" id="inv-maker" onchange="renderInventory()" style="width:160px;"><option value="">전체 Maker</option></select>
         </div>
         <div class="card card-table"><table><thead><tr>
@@ -920,7 +920,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
           <div class="card-body">
             <!-- 1행: 품목(넓게) | 수량 | 입고일자 | 공급업체 -->
             <div class="inout-row1">
-              <div class="form-group"><label class="form-label">품목 선택 * <button type="button" onclick="openScanner('in')" style="margin-left:6px;border:1px solid var(--border2);background:var(--surface2);border-radius:6px;padding:1px 8px;font-size:11px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">📷 스캔</button></label><div class="inout-combo-wrap"><input type="text" class="form-control" id="in-item-search" placeholder="코드 또는 품목명 검색..." autocomplete="off" oninput="inoutComboFilter('in',this.value)" onfocus="inoutComboOpen('in')" onkeydown="inoutComboKey(event,'in')" onblur="setTimeout(()=>{const d=document.getElementById('in-item-dropdown');if(d)d.classList.remove('open');},150)"><div class="inout-combo-dropdown" id="in-item-dropdown"></div></div><select id="in-item" style="display:none"></select></div>
+              <div class="form-group"><label class="form-label">품목 선택 * <button type="button" onclick="openScanner('in')" style="margin-left:6px;border:1px solid var(--border2);background:var(--surface2);border-radius:6px;padding:1px 8px;font-size:11px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">📷 스캔</button></label><div class="inout-combo-wrap"><input type="text" class="form-control" id="in-item-search" placeholder="코드·품목명·Maker 검색..." autocomplete="off" oninput="inoutComboFilter('in',this.value)" onfocus="inoutComboOpen('in')" onkeydown="inoutComboKey(event,'in')" onblur="setTimeout(()=>{const d=document.getElementById('in-item-dropdown');if(d)d.classList.remove('open');},150)"><div class="inout-combo-dropdown" id="in-item-dropdown"></div></div><select id="in-item" style="display:none"></select></div>
               <div class="form-group"><label class="form-label">입고 수량 *</label><input class="form-control" type="number" id="in-qty" placeholder="수량"></div>
               <div class="form-group"><label class="form-label">입고일자 *</label><input class="form-control" type="date" id="in-date"></div>
               <div class="form-group"><label class="form-label">공급업체</label><input class="form-control" type="text" id="in-supplier" placeholder="공급업체명"></div>
@@ -963,7 +963,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
           </div>
           <div class="card-body">
             <div class="inout-row1">
-              <div class="form-group"><label class="form-label">품목 선택 * <button type="button" onclick="openScanner('out')" style="margin-left:6px;border:1px solid var(--border2);background:var(--surface2);border-radius:6px;padding:1px 8px;font-size:11px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">📷 스캔</button></label><div class="inout-combo-wrap"><input type="text" class="form-control" id="out-item-search" placeholder="코드 또는 품목명 검색..." autocomplete="off" oninput="inoutComboFilter('out',this.value)" onfocus="inoutComboOpen('out')" onkeydown="inoutComboKey(event,'out')" onblur="setTimeout(()=>{const d=document.getElementById('out-item-dropdown');if(d)d.classList.remove('open');},150)"><div class="inout-combo-dropdown" id="out-item-dropdown"></div></div><select id="out-item" style="display:none"></select></div>
+              <div class="form-group"><label class="form-label">품목 선택 * <button type="button" onclick="openScanner('out')" style="margin-left:6px;border:1px solid var(--border2);background:var(--surface2);border-radius:6px;padding:1px 8px;font-size:11px;cursor:pointer;font-family:'Noto Sans KR',sans-serif;">📷 스캔</button></label><div class="inout-combo-wrap"><input type="text" class="form-control" id="out-item-search" placeholder="코드·품목명·Maker 검색..." autocomplete="off" oninput="inoutComboFilter('out',this.value)" onfocus="inoutComboOpen('out')" onkeydown="inoutComboKey(event,'out')" onblur="setTimeout(()=>{const d=document.getElementById('out-item-dropdown');if(d)d.classList.remove('open');},150)"><div class="inout-combo-dropdown" id="out-item-dropdown"></div></div><select id="out-item" style="display:none"></select></div>
               <div class="form-group"><label class="form-label">출고 수량 *</label><input class="form-control" type="number" id="out-qty" placeholder="수량"></div>
               <div class="form-group"><label class="form-label">박스수량 <span style="font-size:10px;color:var(--text3);font-weight:400;">박스×장입=수량</span></label><input class="form-control" type="number" id="out-boxqty" min="0" placeholder="박스 수"></div>
               <div class="form-group"><label class="form-label">장입수량 <span style="font-size:9px;color:var(--text3);font-weight:400;">품목관리 등록값</span></label><div class="form-control" id="out-boxunit" style="background:var(--surface2);color:var(--text3);">—</div></div>
@@ -1011,7 +1011,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
       <!-- 이력 조회 -->
       <div class="tab-content" id="tab-history">
         <div class="searchbar">
-          <input class="form-control" type="text" placeholder="품목명 또는 코드 검색..." id="hist-search" oninput="renderHistory()">
+          <input class="form-control" type="text" placeholder="품목명·코드·거래처·Maker 검색..." id="hist-search" oninput="renderHistory()">
           <select class="form-control" id="hist-item-code" onchange="renderHistory()" style="width:170px;"><option value="">전체 품목코드</option></select>
           <select class="form-control" id="hist-type" onchange="renderHistory()" style="width:110px;"><option value="">전체 유형</option><option value="in">입고</option><option value="out">출고</option></select>
           <select class="form-control" id="hist-partner" onchange="renderHistory()" style="width:130px;"><option value="">전체 거래처</option></select>
@@ -1118,7 +1118,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
             <button class="btn btn-secondary" onclick="renderSafetyStockAnalysis()">🔬 안전재고 자동 분석</button>
             <button class="btn btn-secondary" id="pt-toggle-btn" onclick="togglePriceTable()">💰 단가표</button>
             <button class="btn btn-secondary" id="stock-align-btn" onclick="openStockAlignModal()" style="display:none" title="기준일 실제 재고를 넣어 초기 재고를 맞춥니다">📏 재고 맞추기</button>
-            <input class="form-control" type="text" id="items-search" placeholder="품목코드, 품목명, MAKER 검색..." oninput="renderItemsTab()" style="max-width:280px;">
+            <input class="form-control" type="text" id="items-search" placeholder="품목코드·품목명·Maker·품명 검색..." oninput="renderItemsTab()" style="max-width:280px;">
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
 <button id="items-excel-template-btn" class="btn btn-secondary" onclick="downloadItemsExcelTemplate()" style="display:none;font-size:12px;">📋 엑셀 양식</button>
@@ -1288,7 +1288,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
           <div class="searchbar" style="margin-bottom:0;flex:1;margin-right:12px;">
-            <input class="form-control" type="text" placeholder="품목명·코드·공급업체 검색..." id="ord-search" oninput="renderOrders()">
+            <input class="form-control" type="text" placeholder="품목명·코드·Maker·공급업체 검색..." id="ord-search" oninput="renderOrders()">
             <select class="form-control" id="ord-status" onchange="renderOrders()" style="width:130px;">
               <option value="">전체 단계</option>
               <option value="발주요청">발주 요청</option>
@@ -1314,7 +1314,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
         </div>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
           <div class="searchbar" style="margin-bottom:0;flex:1;margin-right:12px;">
-            <input class="form-control" type="text" placeholder="품목명 또는 코드 검색..." id="fc-search" oninput="renderForecast()">
+            <input class="form-control" type="text" placeholder="품목명·코드·Maker·출고처 검색..." id="fc-search" oninput="renderForecast()">
             <select class="form-control" id="fc-item-filter" onchange="renderForecast()" style="width:180px;">
               <option value="">전체 품목</option>
             </select>
@@ -1409,7 +1409,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
           </div>
         </div>
         <div class="searchbar">
-          <input class="form-control" type="text" placeholder="품목명·코드·거래처 검색..." id="fin-search" oninput="renderFinance()">
+          <input class="form-control" type="text" placeholder="품목명·코드·거래처·Maker 검색..." id="fin-search" oninput="renderFinance()">
           <select class="form-control" id="fin-type" onchange="renderFinance()" style="width:130px;"><option value="">전체</option><option value="매출">매출(출고)</option><option value="매입">매입(입고)</option></select>
           <select class="form-control" id="fin-period" onchange="onFinPeriodChange()" style="width:130px;">
             <option value="thismonth">이번 달</option>
@@ -1532,7 +1532,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
       <!-- 거래처 관리 -->
       <div class="tab-content" id="tab-customers">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
-          <input class="form-control" type="text" placeholder="거래처명 검색..." id="cust-search" oninput="renderCustomers()" style="max-width:280px;">
+          <input class="form-control" type="text" placeholder="거래처명·사업자번호·대표·담당자 검색..." id="cust-search" oninput="renderCustomers()" style="max-width:280px;">
           <div style="display:flex;gap:8px;align-items:center;">
             <button class="btn btn-primary" onclick="openCustomerModal()">＋ 거래처 추가</button>
             <button id="bulk-import-btn" class="btn btn-warning" onclick="bulkImportCustomers()" style="display:none;font-size:12px;">📥 일괄 등록 (278건)</button>
@@ -1559,7 +1559,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
           </div>
         </div>
         <div class="searchbar">
-          <input class="form-control" type="text" placeholder="품목명, 품목코드 검색..." id="price-search" oninput="renderPrices()">
+          <input class="form-control" type="text" placeholder="품목명·코드·Maker·거래처 검색..." id="price-search" oninput="renderPrices()">
           <select class="form-control" id="price-partner" onchange="renderPrices()" style="width:180px;">
             <option value="">전체 거래처</option>
           </select>
@@ -1591,7 +1591,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
       <!-- 단가 변동 이력 -->
       <div class="tab-content" id="tab-pricehistory">
         <div class="searchbar">
-          <input class="form-control" type="text" placeholder="품목명, 코드 또는 거래처 검색..." id="ph-search" oninput="renderPriceHistory()">
+          <input class="form-control" type="text" placeholder="품목명·코드·Maker·거래처 검색..." id="ph-search" oninput="renderPriceHistory()">
           <select class="form-control" id="ph-item" onchange="renderPriceHistory()" style="width:180px;">
             <option value="">전체 품목</option>
           </select>
@@ -1605,7 +1605,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
       <!-- LG인정가 변동 이력 -->
       <div class="tab-content" id="tab-lgpricehistory">
         <div class="searchbar" style="flex-wrap:wrap;gap:8px;">
-          <input class="form-control" type="text" placeholder="품목명 또는 코드 검색..." id="lph-search" oninput="renderLgPriceHistoryTab()" style="flex:1;min-width:160px;">
+          <input class="form-control" type="text" placeholder="품목명·코드·Maker 검색..." id="lph-search" oninput="renderLgPriceHistoryTab()" style="flex:1;min-width:160px;">
           <select class="form-control" id="lph-item" onchange="renderLgPriceHistoryTab()" style="width:200px;">
             <option value="">전체 품목</option>
           </select>
@@ -1624,7 +1624,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
       <!-- 입고 단가 변동 이력 -->
       <div class="tab-content" id="tab-buypricehistory">
         <div class="searchbar" style="flex-wrap:wrap;gap:8px;">
-          <input class="form-control" type="text" placeholder="품목명 또는 코드 검색..." id="bph-search" oninput="renderBuyPriceHistoryTab()" style="flex:1;min-width:160px;">
+          <input class="form-control" type="text" placeholder="품목명·코드·Maker 검색..." id="bph-search" oninput="renderBuyPriceHistoryTab()" style="flex:1;min-width:160px;">
           <select class="form-control" id="bph-item" onchange="renderBuyPriceHistoryTab()" style="width:200px;">
             <option value="">전체 품목</option>
           </select>
@@ -2279,7 +2279,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
 /* ── 프로그램 버전 & 새 버전 알림 ──
    GitHub에 새 index.html을 올리면 열려 있는 화면이 5분마다(그리고 창으로 돌아올 때) 확인해서
    상단에 '새 버전' 알림을 띄움 → [지금 적용]을 누르면 새 파일을 받아 바로 적용 (Ctrl+F5 불필요) */
-const APP_VERSION = '2026.11.09-7';
+const APP_VERSION = '2026.11.09-9';
 (function(){
   const lbl = document.getElementById('app-version-label');
   if(lbl) lbl.textContent = '버전 ' + APP_VERSION;
@@ -3009,7 +3009,7 @@ function renderInventory() {
     makerSel.value=curMaker;
   }
   let f=getItems().filter(i=>{
-    if(q&&!i.name.toLowerCase().includes(q)&&!i.code.toLowerCase().includes(q)) return false;
+    if(q&&!textMatch(q,[i.name,i.code,i.maker,i.typeName])) return false;
     if(selMaker&&(i.maker||'').trim()!==selMaker) return false;
     return true;
   });
@@ -3052,11 +3052,7 @@ function fmtItemPrice(val, cur) {
 function renderItemsTab() {
   const q = (document.getElementById('items-search')||{}).value?.toLowerCase().trim()||'';
   let items = applySort('items', getItems(), itemsSortValue);
-  if(q) items = items.filter(i =>
-    (i.code||'').toLowerCase().includes(q) ||
-    (i.name||'').toLowerCase().includes(q) ||
-    (i.maker||'').toLowerCase().includes(q)
-  );
+  if(q) items = items.filter(i => textMatch(q, [i.code, i.name, i.maker, i.typeName]));
   document.getElementById('items-body').innerHTML=items.length===0?`<tr><td colspan="9"><div class="empty">${q?'검색 결과가 없습니다.':'등록된 품목이 없습니다.'}</div></td></tr>`:
     items.map(i=>`<tr>
       <td class="mono">${i.code}</td>
@@ -3116,12 +3112,7 @@ function _ptEsc(s) {
 function _ptBuildData() {
   const q = (document.getElementById('items-search')||{}).value?.toLowerCase().trim()||'';
   let items = getItems().slice();
-  if(q) items = items.filter(i =>
-    (i.code||'').toLowerCase().includes(q) ||
-    (i.name||'').toLowerCase().includes(q) ||
-    (i.maker||'').toLowerCase().includes(q) ||
-    (i.typeName||'').toLowerCase().includes(q)
-  );
+  if(q) items = items.filter(i => textMatch(q, [i.code, i.name, i.maker, i.typeName]));
   // 업체별 가격 열: 표시되는 품목에 단가가 등록된 (거래처, 매출/매입) 조합
   const names = new Set(items.map(i=>i.name));
   const colMap = new Map();
@@ -4816,11 +4807,7 @@ function renderHistory() {
   });
 
   let f = getHistory().filter(h => {
-    if(q) {
-      const it = getItem(h.itemName);
-      const codeMatch = it && it.code.toLowerCase().includes(q);
-      if(!h.itemName.toLowerCase().includes(q) && !codeMatch) return false;
-    }
+    if(q && !histTextMatch(h, q)) return false;
     if(type && h.type !== type) return false;
     if(partner && (h.partner||'') !== partner) return false;
     if(itemCode) {
@@ -5267,6 +5254,28 @@ async function previewFixHistoryPartners() {
 /* ── 거래처명 맞추기 (이력 조회 현재 조건 기준) ──────────────────────────────
    조회 조건(기간·Maker·품목코드·유형·검색·거래처)에 걸린 이력의 거래처명을
    거래처 관리에 등록된 이름으로 바꿈. 이력 + 연결된 매출·매입 장부 + 미수금까지 함께 변경. */
+/* 공용 검색: 여러 단어는 모두 들어 있어야 하고(예: '테크노 0401'), (주)·㈜·주식회사·공백 차이는 무시 */
+function textMatch(q, fields) {
+  const low = fields.map(v => String(v==null?'':v).toLowerCase());
+  const nrm = fields.map(v => _pmNorm(v));
+  return String(q||'').toLowerCase().split(/\s+/).filter(Boolean)
+    .every(w => low.some(v => v.includes(w)) || (_pmNorm(w) && nrm.some(v => v.includes(_pmNorm(w)))));
+}
+/* 품목명으로 품목코드·Maker·품명까지 검색 대상에 포함 */
+function itemFields(itemName, code) {
+  const it = (code && getItems().find(i => i.code === code)) || getItem(itemName) || {};
+  return [itemName, it.name, it.code || code, it.maker, it.typeName];
+}
+/* 이력 검색어 일치: 품목명·품목코드·거래처·Maker·비고
+   여러 단어는 모두 들어 있어야 함 (예: '테크노 0401'), (주)·㈜·공백 차이는 무시 */
+function histTextMatch(h, q) {
+  const it = getItem(h.itemName);
+  const fields = [h.itemName, it && it.code, h.partner, h.supplier, it && it.maker, it && it.typeName, h.note];
+  const low = fields.map(v => String(v||'').toLowerCase());
+  const nrm = fields.map(v => _pmNorm(v));
+  return String(q).toLowerCase().split(/\s+/).filter(Boolean)
+    .every(w => low.some(v => v.includes(w)) || (_pmNorm(w) && nrm.some(v => v.includes(_pmNorm(w)))));
+}
 function getHistoryFilteredByView() {
   const val = id => (document.getElementById(id)||{}).value || '';
   const q = val('hist-search').toLowerCase(), type = val('hist-type'), period = val('hist-period') || 'all';
@@ -5275,11 +5284,7 @@ function getHistoryFilteredByView() {
   const dateTo   = period==='custom' ? val('hist-date-to')   : '';
   const now = new Date();
   return getHistory().filter(h => {
-    if(q) {
-      const it = getItem(h.itemName);
-      const codeMatch = it && it.code.toLowerCase().includes(q);
-      if(!(h.itemName||'').toLowerCase().includes(q) && !codeMatch) return false;
-    }
+    if(q && !histTextMatch(h, q)) return false;
     if(type && h.type !== type) return false;
     if(partner && (h.partner||'') !== partner) return false;
     if(itemCode) { const item=getItem(h.itemName); if(!item||item.code!==itemCode) return false; }
@@ -6128,11 +6133,7 @@ function exportHistoryCSV() {
   const now      = new Date();
 
   const filtered = getHistory().filter(h => {
-    if(q) {
-      const it = getItem(h.itemName);
-      const codeMatch = it && it.code.toLowerCase().includes(q);
-      if(!h.itemName.toLowerCase().includes(q) && !codeMatch) return false;
-    }
+    if(q && !histTextMatch(h, q)) return false;
     if(type && h.type !== type) return false;
     if(partner && (h.partner||'') !== partner) return false;
     if(itemCode) { const item=getItem(h.itemName); if(!item||item.code!==itemCode) return false; }
@@ -6177,11 +6178,7 @@ function exportHistoryXLSX() {
   const now      = new Date();
 
   const filtered = getHistory().filter(h => {
-    if(q) {
-      const it = getItem(h.itemName);
-      const codeMatch = it && it.code.toLowerCase().includes(q);
-      if(!h.itemName.toLowerCase().includes(q) && !codeMatch) return false;
-    }
+    if(q && !histTextMatch(h, q)) return false;
     if(type && h.type !== type) return false;
     if(partner && (h.partner||'') !== partner) return false;
     if(itemCode) { const item=getItem(h.itemName); if(!item||item.code!==itemCode) return false; }
@@ -6794,7 +6791,7 @@ function getFilteredFinance() {
     if(q) {
       const it=getItem(f.itemName);
       const codeMatch=it && it.code.toLowerCase().includes(q);
-      if(!f.itemName?.toLowerCase().includes(q) && !f.partner?.toLowerCase().includes(q) && !codeMatch) return false;
+      if(!textMatch(q, [...itemFields(f.itemName), f.partner, f.note])) return false;
     }
     if(type&&f.type!==type) return false;
     if(range) {
@@ -7318,7 +7315,7 @@ function renderPrices() {
     if(q){
       const item=getItem(p.itemName);
       const codeMatch=item&&item.code.toLowerCase().includes(q);
-      if(!p.itemName?.toLowerCase().includes(q)&&!codeMatch) return false;
+      if(!textMatch(q, [...itemFields(p.itemName), p.partner])) return false;
     }
     if(partner&&p.partner!==partner) return false;
     if(type&&p.type!==type) return false;
@@ -7381,7 +7378,7 @@ function renderPriceHistory() {
     if(q) {
       const it=getItem(h.itemName);
       const codeMatch=it && it.code.toLowerCase().includes(q);
-      if(!h.itemName?.toLowerCase().includes(q) && !h.partner?.toLowerCase().includes(q) && !codeMatch) return false;
+      if(!textMatch(q, [...itemFields(h.itemName), h.partner])) return false;
     }
     if(itemFilter&&h.itemName!==itemFilter) return false;
     return true;
@@ -7470,9 +7467,7 @@ function renderBuyPriceHistoryTab() {
   const rows=getBuyPriceHistory().filter(h=>{
     if(q){
       const it=getItems().find(i=>i.code===h.itemCode);
-      const nameMatch=h.itemName?.toLowerCase().includes(q);
-      const codeMatch=h.itemCode?.toLowerCase().includes(q);
-      if(!nameMatch&&!codeMatch) return false;
+      if(!textMatch(q, [...itemFields(h.itemName, h.itemCode), h.maker, h.changedBy])) return false;
     }
     if(itemFilter&&h.itemCode!==itemFilter) return false;
     return true;
@@ -7551,7 +7546,7 @@ function renderLgPriceHistoryTab() {
     sel.value=cur;
   }
   const rows=getLgPriceHistory().filter(h=>{
-    if(q){ if(!h.itemName?.toLowerCase().includes(q)&&!h.itemCode?.toLowerCase().includes(q)) return false; }
+    if(q){ if(!textMatch(q, [...itemFields(h.itemName, h.itemCode), h.maker, h.changedBy])) return false; }
     if(itemFilter&&h.itemCode!==itemFilter) return false;
     return true;
   });
@@ -7604,7 +7599,7 @@ function renderOrders() {
     if(q) {
       const it=getItem(o.itemName);
       const codeMatch=it && it.code.toLowerCase().includes(q);
-      if(!o.itemName?.toLowerCase().includes(q) && !o.supplier?.toLowerCase().includes(q) && !codeMatch) return false;
+      if(!textMatch(q, [...itemFields(o.itemName), o.supplier, o.note])) return false;
     }
     if(st&&o.status!==st) return false;
     return true;
@@ -7758,7 +7753,7 @@ function renderForecast() {
     if(q) {
       const it=getItem(f.itemName);
       const codeMatch=it && it.code.toLowerCase().includes(q);
-      if(!f.itemName?.toLowerCase().includes(q) && !codeMatch) return false;
+      if(!textMatch(q, [...itemFields(f.itemName), f.dest, f.note])) return false;
     }
     if(itemFilter&&f.itemName!==itemFilter) return false;
     return true;
@@ -8373,7 +8368,7 @@ function getCustomer(name) {
 
 function renderCustomers() {
   const q = (document.getElementById('cust-search')||{}).value?.toLowerCase()||'';
-  const list = getCustomers().filter(c => !q || c.name?.toLowerCase().includes(q));
+  const list = getCustomers().filter(c => !q || textMatch(q, [c.name, c.regno, c.ceo, c.manager, c.tel, c.email, c.addr, c.note]));
   document.getElementById('customers-body').innerHTML = list.length===0
     ? `<tr><td colspan="11"><div class="empty">등록된 거래처가 없습니다.</div></td></tr>`
     : list.map(c=>`<tr>
@@ -10539,7 +10534,7 @@ function inoutComboFilter(prefix, q) {
   const lq = (q||'').toLowerCase().trim();
   const esc = s => s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   const hl  = (txt, q) => q ? txt.replace(new RegExp(esc(q),'gi'), m=>`<mark>${m}</mark>`) : txt;
-  const filtered = lq ? items.filter(i => i.code.toLowerCase().includes(lq) || i.name.toLowerCase().includes(lq)) : items;
+  const filtered = lq ? items.filter(i => textMatch(lq, [i.code, i.name, i.maker, i.typeName])) : items;
   let listHtml;
   if(filtered.length === 0) {
     listHtml = '<div style="padding:8px 12px;color:var(--text3);font-size:12px;">검색 결과 없음</div>';
