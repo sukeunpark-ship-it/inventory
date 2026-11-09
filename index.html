@@ -1776,8 +1776,8 @@ textarea.form-control{min-height:64px;resize:vertical;}
   <div class="modal" style="width:960px;max-width:96vw;">
     <div class="modal-title" id="modal-title">품목 추가</div>
     <div class="form-grid" style="grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
-      <div class="form-group"><label class="form-label">LG P/No *</label><input class="form-control" type="text" id="if-code" placeholder="EAE00220101" oninput="checkDuplicateCode()"><div id="if-code-msg" style="font-size:11px;margin-top:3px;min-height:14px;"></div></div>
-      <div class="form-group"><label class="form-label">Maker P/no (형명) *</label><input class="form-control" type="text" id="if-name" placeholder="품목명"></div>
+      <div class="form-group"><label class="form-label">LG P/No *</label><input class="form-control" type="text" id="if-code" placeholder="예: EAE00220101" oninput="checkDuplicateCode()" onblur="checkDuplicateCode()"><div id="if-code-msg" style="font-size:11px;margin-top:3px;min-height:14px;"></div></div>
+      <div class="form-group"><label class="form-label">Maker P/no (형명) *</label><input class="form-control" type="text" id="if-name" placeholder="예: CMPP AC275V105K27.5C6R1" oninput="checkDuplicateCode()" onblur="checkDuplicateCode()"><div id="if-name-msg" style="font-size:11px;margin-top:3px;min-height:14px;"></div></div>
     </div>
     <div class="form-grid" style="grid-template-columns:1fr 1fr 1fr 1fr;gap:14px;margin-bottom:14px;">
       <div class="form-group"><label class="form-label">단위 *</label><input class="form-control" type="text" id="if-unit" placeholder="개, 박스…"></div>
@@ -2279,7 +2279,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
 /* ── 프로그램 버전 & 새 버전 알림 ──
    GitHub에 새 index.html을 올리면 열려 있는 화면이 5분마다(그리고 창으로 돌아올 때) 확인해서
    상단에 '새 버전' 알림을 띄움 → [지금 적용]을 누르면 새 파일을 받아 바로 적용 (Ctrl+F5 불필요) */
-const APP_VERSION = '2026.11.09-9';
+const APP_VERSION = '2026.11.09-11';
 (function(){
   const lbl = document.getElementById('app-version-label');
   if(lbl) lbl.textContent = '버전 ' + APP_VERSION;
@@ -5820,20 +5820,33 @@ function printStatement(data) {
   w.document.close();
 }
 
+/* 품목 중복 확인: LG P/No·Maker P/no를 대소문자·공백·하이픈 차이 없이 비교 */
+const _codeKey = s => String(s||'').toUpperCase().replace(/[\s\-_.]/g,'');
+function findDupItem(field, value, editCode) {
+  const k = _codeKey(value); if(!k) return null;
+  return getItems().find(i => i.code !== editCode && _codeKey(field === 'code' ? i.code : i.name) === k) || null;
+}
+function _dupHtml(label, it) {
+  return `<div style="margin-top:4px;padding:6px 10px;border:1px solid #F09595;background:#FCEBEB;border-radius:6px;color:var(--red);font-size:12px;line-height:1.6;">
+    ⚠ <b>이미 등록된 ${label}입니다</b><br>
+    <span style="color:var(--text2)">${_ptEsc(it.code)} · ${_ptEsc(it.name)}${it.maker?' · '+_ptEsc(it.maker):''} · 현재고 ${(it.stock||0).toLocaleString()}${_ptEsc(it.unit||'')}</span>
+    <button type="button" onclick="editItem('${String(it.code).replace(/'/g,"\\'")}')" style="margin-left:6px;border:1px solid #F09595;background:#fff;color:var(--red);border-radius:5px;padding:1px 8px;font-size:11px;cursor:pointer;">그 품목 수정하기</button>
+  </div>`;
+}
 function checkDuplicateCode() {
-  const code = document.getElementById('if-code').value.trim();
   const editCode = document.getElementById('if-edit-code').value;
-  const msgEl = document.getElementById('if-code-msg');
-  if(!code || !msgEl) return;
-  const dup = getItems().find(i=>i.code===code);
-  if(dup && dup.code !== editCode) {
-    msgEl.style.color = 'var(--red)';
-    msgEl.textContent = `⚠ 이미 등록된 품목코드입니다 — ${dup.name}`;
-  } else if(code) {
-    msgEl.style.color = 'var(--green)';
-    msgEl.textContent = '✓ 사용 가능한 코드입니다.';
-  } else {
-    msgEl.textContent = '';
+  const code = document.getElementById('if-code').value.trim();
+  const name = (document.getElementById('if-name')||{}).value?.trim() || '';
+  const cm = document.getElementById('if-code-msg'), nm = document.getElementById('if-name-msg');
+  // 내용이 같으면 다시 그리지 않음 (버튼 누를 때 입력칸 blur로 버튼이 사라지는 것 방지)
+  const put = (el, html) => { if(el && el._html !== html) { el.innerHTML = html; el._html = html; } };
+  if(cm) {
+    const d = findDupItem('code', code, editCode);
+    put(cm, !code ? '' : d ? _dupHtml('LG P/No', d) : '<span style="color:var(--green)">✓ 사용 가능한 코드입니다.</span>');
+  }
+  if(nm) {
+    const d = findDupItem('name', name, editCode);
+    put(nm, name && d ? _dupHtml('Maker P/no', d) : '');
   }
 }
 
@@ -5844,7 +5857,7 @@ function openItemModal() {
   ['if-code','if-name','if-unit','if-safe','if-stock','if-note','if-maker','if-buyprice','if-sellprice','if-leadtime','if-boxqty','if-smallboxqty','if-typename','if-buyprice-date','if-sellprice-date','if-box-w','if-box-d','if-box-h','if-box-wt','if-hscode','if-origin'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
   const bCur=document.getElementById('if-buyprice-cur'); if(bCur) bCur.value='KRW';
   const sCur=document.getElementById('if-sellprice-cur'); if(sCur) sCur.value='KRW';
-  const msgEl=document.getElementById('if-code-msg'); if(msgEl) msgEl.textContent='';
+  ['if-code-msg','if-name-msg'].forEach(id=>{const m=document.getElementById(id); if(m){ m.innerHTML=''; m._html=''; }});
   document.getElementById('if-cat').value='원자재';
   // 단가 섹션 초기화 (신규 추가 시 표시)
   document.getElementById('if-price-rows').innerHTML='';
@@ -5889,6 +5902,7 @@ function editItem(code) {
   const bwtEl=document.getElementById('if-box-wt'); if(bwtEl) bwtEl.value=i.boxWt||'';
   const hsEl=document.getElementById('if-hscode'); if(hsEl) hsEl.value=i.hsCode||'';
   const origEl=document.getElementById('if-origin'); if(origEl) origEl.value=i.origin||'';
+  ['if-code-msg','if-name-msg'].forEach(id=>{const m=document.getElementById(id); if(m){ m.innerHTML=''; m._html=''; }});
   document.getElementById('item-modal').classList.add('open');
 }
 
@@ -5922,12 +5936,15 @@ async function saveItem() {
     hsCode:(document.getElementById('if-hscode')?.value||'').trim(),
     origin:(document.getElementById('if-origin')?.value||'').trim()};
   obj[editCode ? 'updatedBy' : 'createdBy'] = getCurrentUserLabel();
-  if(!editCode && getItems().find(i=>i.code===code)){
-    const msgEl=document.getElementById('if-code-msg');
-    if(msgEl){msgEl.style.color='var(--red)';msgEl.textContent='⚠ 이미 등록된 품목코드입니다. 다른 코드를 사용하세요.';}
-    showToast('⚠ 이미 존재하는 품목코드입니다.');
+  // 중복 확인 (대소문자·공백·하이픈 무시)
+  const dupCode = findDupItem('code', code, editCode);
+  if(dupCode){
+    checkDuplicateCode();
+    alert(`이미 등록된 LG P/No입니다.\n\n${dupCode.code} · ${dupCode.name}${dupCode.maker?' · '+dupCode.maker:''}\n\n기존 품목을 고치려면 '그 품목 수정하기'를 누르세요.`);
     return;
   }
+  const dupName = findDupItem('name', name, editCode);
+  if(dupName && !confirm(`같은 Maker P/no가 이미 다른 코드로 등록되어 있습니다.\n\n${dupName.code} · ${dupName.name}\n\n그래도 저장할까요?`)) return;
   // 입고단가 / LG인정가 변동 이력 기록 (수정 시에만)
   if(editCode) {
     const prevItem = getItems().find(i=>i.code===editCode);
@@ -6858,7 +6875,10 @@ function renderFinance() {
     } else {
       tail=` · 차이 <span style="color:${s-p>=0?'var(--blue)':'var(--red)'};font-weight:600">${won(s-p)}</span>`;
     }
-    sumEl.innerHTML=`<b>${label}</b> · ${fin.length.toLocaleString()}건 · 매출 <span style="color:var(--green);font-weight:600">${won(s)}</span> · 매입 <span style="color:var(--red);font-weight:600">${won(p)}</span>${tail}`;
+    const seg = `<span class="pt-seg fin-mode-seg" style="margin-left:10px;vertical-align:middle;">`+
+      `<button type="button" data-m="diff" class="${mode==='diff'?'on':''}" onclick="setFinProfitMode('diff')" title="매출 합계 - 매입 합계">매출-매입</button>`+
+      `<button type="button" data-m="cogs" class="${mode==='cogs'?'on':''}" onclick="setFinProfitMode('cogs')" title="Σ (판매단가 - 입고단가) × 출고수량">이익</button></span>`;
+    sumEl.innerHTML=`<b>${label}</b> · ${fin.length.toLocaleString()}건 · 매출 <span style="color:var(--green);font-weight:600">${won(s)}</span> · 매입 <span style="color:var(--red);font-weight:600">${won(p)}</span>${tail}${seg}`;
   }
   const thisMonth=TODAY.slice(0,7);
   const mLabel=`${thisMonth.slice(0,4)}년 ${parseInt(thisMonth.slice(5))}월 1일~ · `;
