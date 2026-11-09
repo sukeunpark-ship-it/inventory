@@ -104,6 +104,8 @@
     if(histFixBtn) histFixBtn.style.display = isSuperAdmin ? '' : 'none';
     const histMatchBtn = document.getElementById('hist-match-partner-btn');
     if(histMatchBtn) histMatchBtn.style.display = isSuperAdmin ? '' : 'none';
+    const stockAlignBtn = document.getElementById('stock-align-btn');
+    if(stockAlignBtn) stockAlignBtn.style.display = isSuperAdmin ? '' : 'none';
     // 품목 엑셀 일괄 등록 버튼: 최고 관리자만 표시
     const itemsExcelTplBtn = document.getElementById('items-excel-template-btn');
     if(itemsExcelTplBtn) itemsExcelTplBtn.style.display = isSuperAdmin ? '' : 'none';
@@ -835,6 +837,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
         <span id="sync-label">실시간 연결됨</span>
       </div>
       <div style="margin-top:5px;font-size:10px;color:var(--text3)">변경사항이 즉시 팀과 공유됩니다</div>
+      <div style="margin-top:3px;font-size:10px;color:var(--text3)" id="app-version-label"></div>
       <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;" id="finance-perm-btn-wrap" style="display:none">
       <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;" id="account-add-btn-wrap" style="display:none">
         <button onclick="openAccountModal()" style="width:100%;background:transparent;border:1px solid var(--border2);color:var(--text2);border-radius:var(--r);padding:6px;font-size:11px;font-family:'Noto Sans KR',sans-serif;cursor:pointer;font-weight:500;">👤+ 계정 등록</button>
@@ -1111,6 +1114,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
           <div style="display:flex;align-items:center;gap:8px;flex:1;">
             <button class="btn btn-secondary" onclick="renderSafetyStockAnalysis()">🔬 안전재고 자동 분석</button>
             <button class="btn btn-secondary" id="pt-toggle-btn" onclick="togglePriceTable()">💰 단가표</button>
+            <button class="btn btn-secondary" id="stock-align-btn" onclick="openStockAlignModal()" style="display:none" title="기준일 실제 재고를 넣어 초기 재고를 맞춥니다">📏 재고 맞추기</button>
             <input class="form-control" type="text" id="items-search" placeholder="품목코드, 품목명, MAKER 검색..." oninput="renderItemsTab()" style="max-width:280px;">
           </div>
           <div style="display:flex;gap:8px;align-items:center;">
@@ -2269,6 +2273,49 @@ textarea.form-control{min-height:64px;resize:vertical;}
 </div>
 
 <script>
+/* ── 프로그램 버전 & 새 버전 알림 ──
+   GitHub에 새 index.html을 올리면 열려 있는 화면이 5분마다(그리고 창으로 돌아올 때) 확인해서
+   상단에 '새 버전' 알림을 띄움 → [지금 적용]을 누르면 새 파일을 받아 바로 적용 (Ctrl+F5 불필요) */
+const APP_VERSION = '2026.11.09-1';
+(function(){
+  const lbl = document.getElementById('app-version-label');
+  if(lbl) lbl.textContent = '버전 ' + APP_VERSION;
+  let shown = false, checking = false;
+  async function checkNewVersion() {
+    if(shown || checking || !/^https?:/.test(location.protocol)) return;
+    checking = true;
+    try {
+      const url = location.pathname + '?vcheck=' + Date.now();     // 주소를 바꿔 GitHub·브라우저 캐시를 피함
+      const txt = await (await fetch(url, { cache: 'no-store' })).text();
+      const m = txt.match(/const APP_VERSION = '([^']+)'/);
+      if(m && m[1] !== APP_VERSION) showUpdateBanner(m[1]);
+    } catch(e) { /* 오프라인 등은 조용히 무시 */ }
+    finally { checking = false; }
+  }
+  function showUpdateBanner(v) {
+    shown = true;
+    const b = document.createElement('div');
+    b.id = 'update-banner';
+    b.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:100000;background:#1a73e8;color:#fff;padding:10px 14px 10px 18px;border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.25);font-size:13px;display:flex;align-items:center;gap:12px;font-family:inherit;';
+    b.innerHTML = `<span>🔄 새 버전이 올라왔습니다 <span style="opacity:.75;font-size:11px">(${v})</span></span>
+      <button style="background:#fff;color:#1a73e8;border:none;border-radius:6px;padding:6px 12px;font-weight:700;cursor:pointer;font-family:inherit;">지금 적용</button>
+      <button title="나중에" style="background:transparent;color:#fff;border:none;font-size:16px;cursor:pointer;padding:0 4px;">×</button>`;
+    const [apply, later] = b.querySelectorAll('button');
+    apply.onclick = async () => {
+      apply.disabled = true; apply.textContent = '적용 중...';
+      try { if(typeof vpFlush === 'function') await vpFlush(); } catch(e) {}
+      try { await fetch(location.pathname, { cache: 'reload' }); } catch(e) {}   // 브라우저에 저장된 옛 파일 교체
+      location.reload();
+    };
+    later.onclick = () => { b.remove(); setTimeout(() => { shown = false; }, 30*60*1000); };  // 30분 뒤 다시 알림
+    document.body.appendChild(b);
+  }
+  setTimeout(checkNewVersion, 20000);
+  setInterval(checkNewVersion, 5*60*1000);
+  document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'visible') checkNewVersion(); });
+  window._checkNewVersion = checkNewVersion;
+})();
+
 const TODAY = new Date().toISOString().split('T')[0];
 document.getElementById('today-date-side').textContent = new Date().toLocaleDateString('ko-KR',{year:'numeric',month:'long',day:'numeric'});
 
@@ -2433,10 +2480,11 @@ function getBaseStock(item) {
    저장된 afterStock은 '등록하던 순간'의 재고라서, 지난 날짜 내역을 나중에(예: 대량 업로드로 8월분을 11월에) 넣으면
    그 날짜 기준 재고와 다르게 보임. 화면·내보내기에는 기준재고에서 날짜순으로 다시 계산한 값을 사용
    (runReconcile 과 같은 순서·같은 기준 → 마지막 값 = 현재고) */
-let _runStockCache = { src: null, map: null };
+let _runStockCache = { src: null, items: null, map: null };
 function getRunningStockMap() {
-  const hist = getHistory();
-  if(_runStockCache.src === hist && _runStockCache.map) return _runStockCache.map;
+  const hist = getHistory(), items = getItems();
+  // 이력 또는 품목(초기 재고 수정 등)이 바뀌면 다시 계산
+  if(_runStockCache.src === hist && _runStockCache.items === items && _runStockCache.map) return _runStockCache.map;
   const seq = (h) => (h.date||'') + '|' + String((h.createdAt&&h.createdAt.seconds)||9999999999).padStart(12,'0');
   const byItem = {};
   hist.forEach(h => { const n = (h.itemName||'').trim(); if(n) (byItem[n] = byItem[n] || []).push(h); });
@@ -2450,7 +2498,7 @@ function getRunningStockMap() {
       map.set(h._id, run);
     });
   });
-  _runStockCache = { src: hist, map };
+  _runStockCache = { src: hist, items, map };
   return map;
 }
 function runStockOf(h) {
@@ -3657,6 +3705,156 @@ function exportVolPlanExcel() {
   ws['!cols'] = head.map((h,i)=>({wch: i===3?28 : i<3?14 : 10}));
   const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, `${year} 물동량 계획`);
   XLSX.writeFile(wb, `${year}_물동량계획_${TODAY.replace(/-/g,'')}.xlsx`);
+}
+
+/* ══════════════════════════════════════════════════════════════════════
+   📏 재고 맞추기 (기준일 실제 재고 → 초기 재고 역산)
+   기준일 재고 = 초기 재고 + (기준일까지 입고 − 출고)  →  초기 재고 = 실제 재고 − (기준일까지 순증감)
+   수급계획 엑셀(‘YYYY년 M월 입출고’ 시트, 품목코드 블록의 ‘유니솔렉’ 재고 행)에서 실제 재고를 자동으로 채울 수 있음
+   ══════════════════════════════════════════════════════════════════════ */
+function saNetUntil(item, date) {
+  return getHistory().filter(h => (h.itemName||'').trim() === item.name && h.date && h.date <= date)
+    .reduce((a,h) => a + (h.type === 'in' ? (Number(h.qty)||0) : -(Number(h.qty)||0)), 0);
+}
+function saNetAll(item) {
+  return getHistory().filter(h => (h.itemName||'').trim() === item.name)
+    .reduce((a,h) => a + (h.type === 'in' ? (Number(h.qty)||0) : -(Number(h.qty)||0)), 0);
+}
+function openStockAlignModal() {
+  const currentEmail = window._auth && window._auth.currentUser && window._auth.currentUser.email;
+  if(currentEmail !== 'sk.park@unisolec.com') { showToast('⚠ 관리자만 사용 가능합니다.'); return; }
+  let m = document.getElementById('stock-align-modal');
+  if(!m) {
+    m = document.createElement('div'); m.className = 'modal-bg'; m.id = 'stock-align-modal';
+    m.innerHTML = `<div class="modal" style="width:900px;max-width:96vw;">
+      <div class="modal-title">📏 재고 맞추기 — 기준일 실제 재고 입력</div>
+      <div style="font-size:12px;color:var(--text2);line-height:1.7;margin:-8px 0 10px;">
+        기준일의 <b>실제 재고</b>를 넣으면, 그날까지의 입출고 이력은 그대로 두고 <b>초기 재고</b>를 거꾸로 계산해 맞춥니다.
+        이후 날짜의 '처리 후 재고'와 현재고가 모두 함께 맞춰집니다.
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+        <label style="font-size:12px;">기준일</label>
+        <input type="date" class="form-control" id="sa-date" style="width:150px;" onchange="renderStockAlign()">
+        <select class="form-control" id="sa-maker" style="width:150px;" onchange="renderStockAlign()"></select>
+        <button class="btn btn-info btn-sm" onclick="document.getElementById('sa-file').click()" title="수급계획 엑셀의 '유니솔렉' 재고 행에서 기준일 재고를 채웁니다">📥 수급 엑셀에서 채우기</button>
+        <input type="file" id="sa-file" accept=".xls,.xlsx" style="display:none" onchange="fillStockAlignFromExcel(this)">
+        <span id="sa-msg" style="font-size:11px;color:var(--text3);"></span>
+      </div>
+      <div style="max-height:52vh;overflow:auto;border:1px solid var(--border);border-radius:var(--r);">
+        <table class="pt-table"><thead><tr>
+          <th>품목코드</th><th>Maker P/no</th><th class="num">시스템 재고<br><span style="font-weight:400;font-size:10px">(기준일)</span></th>
+          <th class="num">실제 재고 입력</th><th class="num">차이</th><th class="num">초기 재고<br><span style="font-weight:400;font-size:10px">현재 → 변경</span></th><th class="num">현재고<br><span style="font-weight:400;font-size:10px">변경 후</span></th>
+        </tr></thead><tbody id="sa-body"></tbody></table>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="document.getElementById('stock-align-modal').classList.remove('open')">닫기</button>
+        <button class="btn btn-primary" id="sa-apply" onclick="applyStockAlign()">적용</button>
+      </div>
+    </div>`;
+    document.body.appendChild(m);
+    // 기본 기준일: 지난달 말일
+    const d = new Date(TODAY.slice(0,7) + '-01T00:00:00'); d.setDate(0);
+    document.getElementById('sa-date').value = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+  const ms = document.getElementById('sa-maker'), cur = ms.value;
+  const makers = [...new Set(getItems().map(i => (i.maker||'').trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ko'));
+  ms.innerHTML = '<option value="">전체 Maker</option>' + makers.map(x => `<option${x===cur?' selected':''}>${_ptEsc(x)}</option>`).join('');
+  window._saInput = window._saInput || {};
+  renderStockAlign();
+  m.classList.add('open');
+}
+function saItems() {
+  const mk = (document.getElementById('sa-maker')||{}).value || '';
+  return getItems().filter(i => i.code && !/물류비/.test(i.code + i.name) && (!mk || (i.maker||'').trim() === mk))
+    .sort((a,b)=>a.code.localeCompare(b.code));
+}
+function renderStockAlign() {
+  const date = document.getElementById('sa-date').value;
+  const inp = window._saInput || {};
+  let changes = 0;
+  document.getElementById('sa-body').innerHTML = saItems().map(it => {
+    const base = getBaseStock(it), netD = saNetUntil(it, date), sys = base + netD;
+    const v = inp[it.code];
+    const has = v !== undefined && v !== '' && !isNaN(Number(v));
+    const diff = has ? Number(v) - sys : 0;
+    const newBase = has ? Number(v) - netD : base;
+    const newStock = newBase + saNetAll(it);
+    if(has && diff !== 0) changes++;
+    return `<tr>
+      <td class="mono">${_ptEsc(it.code)}</td><td>${_ptEsc(it.name)}</td>
+      <td class="num">${sys.toLocaleString()}</td>
+      <td class="num"><input class="form-control" style="width:110px;text-align:right;padding:4px 6px;font-size:12px;${has?'background:#FFFBE6;':''}" value="${has?Number(v):''}" placeholder="그대로" data-code="${_ptEsc(it.code)}" onchange="window._saInput[this.dataset.code]=this.value.replace(/,/g,'').trim();renderStockAlign()"></td>
+      <td class="num" style="font-weight:600;color:${!has||!diff?'var(--text3)':diff>0?'var(--green)':'var(--red)'}">${has ? (diff>0?'+':'') + diff.toLocaleString() : '—'}</td>
+      <td class="num">${has && diff ? `${base.toLocaleString()} → <b>${newBase.toLocaleString()}</b>` : base.toLocaleString()}</td>
+      <td class="num">${has && diff ? `<b>${newStock.toLocaleString()}</b>` : (it.stock||0).toLocaleString()}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" class="empty-p" style="padding:16px;">품목이 없습니다.</td></tr>';
+  const btn = document.getElementById('sa-apply');
+  btn.disabled = !changes; btn.textContent = changes ? `적용 (${changes}개 품목)` : '적용';
+}
+async function applyStockAlign() {
+  const date = document.getElementById('sa-date').value, inp = window._saInput || {};
+  const todo = saItems().map(it => {
+    const v = inp[it.code]; if(v === undefined || v === '' || isNaN(Number(v))) return null;
+    const netD = saNetUntil(it, date), sys = getBaseStock(it) + netD;
+    if(Number(v) === sys) return null;
+    const newBase = Number(v) - netD;
+    return { it, newBase, newStock: newBase + saNetAll(it), sys, actual: Number(v) };
+  }).filter(Boolean);
+  if(!todo.length) return;
+  const lines = todo.map(t => `• ${t.it.code}  ${date} 재고 ${t.sys.toLocaleString()} → ${t.actual.toLocaleString()}  (현재고 ${t.newStock.toLocaleString()})`).join('\n');
+  if(!confirm(`${date} 기준 실제 재고로 ${todo.length}개 품목의 초기 재고를 고칩니다.\n입출고 이력은 바뀌지 않습니다.\n\n${lines}\n\n계속할까요?`)) return;
+  let ok = 0;
+  await withSync(async () => {
+    for(const t of todo) { await window._db_updateItem(t.it.code, { baseStock: t.newBase, stock: t.newStock, updatedBy: getCurrentUserLabel() }); ok++; }
+  });
+  window._saInput = {};
+  document.getElementById('stock-align-modal').classList.remove('open');
+  showToast(`✓ ${ok}개 품목 재고를 ${date} 기준으로 맞췄습니다.`);
+}
+/* 수급계획 엑셀에서 기준일 재고 읽기 */
+async function fillStockAlignFromExcel(input) {
+  const f = input.files && input.files[0]; input.value = '';
+  if(!f) return;
+  if(typeof XLSX === 'undefined') { showToast('⚠ 엑셀 라이브러리 로딩 중입니다.'); return; }
+  const date = document.getElementById('sa-date').value;
+  const [Y, M, D] = date.split('-').map(Number);
+  const wb = XLSX.read(new Uint8Array(await f.arrayBuffer()), {type:'array'});
+  const findSheet = (y, m) => wb.SheetNames.find(s => { const x = s.match(/(\d{2,4})\s*년\s*(\d{1,2})\s*월\s*입출고/); return x && ((+x[1] < 100 ? 2000 + +x[1] : +x[1]) === y) && +x[2] === m; });
+  const lastDay = new Date(Y, M, 0).getDate();
+  // 말일이면 다음 달 시트의 '전월말' 열 사용 (31일 칸의 계획 조정값 제외)
+  let sheet = null, useCol = null;
+  const readStocks = (sn, pick) => {
+    const aoa = XLSX.utils.sheet_to_json(wb.Sheets[sn], {header:1, defval:null, blankrows:true});
+    let dRow = -1;
+    for(let i=0;i<Math.min(10,aoa.length);i++){ const nums=(aoa[i]||[]).filter(v=>v!==null&&/^\d+$/.test(String(v).trim())&&+String(v).trim()<=31); if(nums.length>=20){ dRow=i; break; } }
+    if(dRow < 0) return {};
+    const hdr = aoa[dRow]; let col = -1, firstOne = hdr.findIndex(v => String(v||'').trim() === '1');
+    if(pick === 'prev') col = firstOne - 1;
+    else col = hdr.findIndex((v,i) => i >= firstOne && String(v||'').trim() === String(pick));
+    if(col < 0) return {};
+    const out = {}; let code = null;
+    for(let r=dRow+1; r<aoa.length; r++){
+      const row = aoa[r]||[];
+      const lab = row.slice(0, Math.max(firstOne,4)).map(v => String(v==null?'':v));
+      const m = lab.join(' ').match(/E[A-Z]{2}[0-9A-Z]{6,10}/); if(m) code = m[0];
+      if(code && lab.some(s => s.trim() === '유니솔렉') && typeof row[col] === 'number') out[code] = row[col];
+    }
+    return out;
+  };
+  let stocks = {};
+  const nm = M === 12 ? [Y+1, 1] : [Y, M+1];
+  const nextSheet = D === lastDay ? findSheet(nm[0], nm[1]) : null;
+  if(nextSheet) { stocks = readStocks(nextSheet, 'prev'); sheet = nextSheet; useCol = '전월말'; }
+  if(!Object.keys(stocks).length) { sheet = findSheet(Y, M); if(sheet) { stocks = readStocks(sheet, D); useCol = D + '일'; } }
+  if(!sheet || !Object.keys(stocks).length) { showToast(`⚠ ${Y}년 ${M}월 입출고 시트에서 재고를 찾지 못했습니다.`); return; }
+  const items = getItems(); let n = 0;
+  Object.entries(stocks).forEach(([code, v]) => {
+    const it = items.find(i => i.code === code) || items.find(i => String(i.code).replace(/0/g,'') === code.replace(/0/g,''));
+    if(it) { window._saInput[it.code] = String(v); n++; }
+  });
+  document.getElementById('sa-msg').textContent = `‘${sheet}’ ${useCol} 재고에서 ${n}개 품목을 채웠습니다.`;
+  renderStockAlign();
 }
 
 function exportPriceTableExcel() {
