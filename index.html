@@ -764,10 +764,15 @@ textarea.form-control{min-height:64px;resize:vertical;}
 .multi-panel{margin:12px 0 16px;border:1px solid var(--border2);border-radius:10px;overflow:hidden}
 .multi-heading{display:flex;justify-content:space-between;padding:10px 14px;background:var(--surface2);font-weight:600}
 .multi-list{max-height:320px;overflow:auto}
-.multi-line{display:grid;grid-template-columns:minmax(120px,2fr) 90px 120px 90px 36px;gap:8px;align-items:center;padding:9px 12px;border-top:1px solid var(--border);font-size:12px}
+.multi-line{display:grid;grid-template-columns:minmax(120px,2fr) 90px 110px 130px 36px;gap:8px;align-items:center;padding:9px 12px;border-top:1px solid var(--border);font-size:12px}
+.multi-line .multi-amt{text-align:right;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.multi-line.multi-head{padding:6px 12px;font-size:11px;color:var(--text3);font-weight:600;background:var(--surface)}
+.multi-line.multi-head span:nth-child(n+2){text-align:right}
+.multi-line.multi-foot{background:var(--blue-bg);font-weight:700;color:var(--blue)}
+.multi-line.multi-foot span:nth-child(n+2){text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 .multi-line input{width:100%;min-width:0;padding:5px;border:1px solid var(--border2);border-radius:5px}
 .multi-empty{padding:14px;color:var(--text3);font-size:12px}
-@media(max-width:700px){.multi-line{grid-template-columns:minmax(110px,1fr) 65px 75px 28px}.multi-line .multi-currency{display:none}}
+@media(max-width:700px){.multi-line{grid-template-columns:minmax(100px,1fr) 62px 70px 92px 28px;gap:5px}}
 </style>
 </head>
 <body>
@@ -2328,7 +2333,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
 /* ── 프로그램 버전 & 새 버전 알림 ──
    GitHub에 새 index.html을 올리면 열려 있는 화면이 5분마다(그리고 창으로 돌아올 때) 확인해서
    상단에 '새 버전' 알림을 띄움 → [지금 적용]을 누르면 새 파일을 받아 바로 적용 (Ctrl+F5 불필요) */
-const APP_VERSION = '2026.11.10-2';
+const APP_VERSION = '2026.11.10-3';
 (function(){
   const lbl = document.getElementById('app-version-label');
   if(lbl) lbl.textContent = '버전 ' + APP_VERSION;
@@ -5140,25 +5145,57 @@ function multiAdd(type){
   const amt=document.getElementById(type+'-amount');if(amt)amt.textContent='—';
   if(type==='out'){const box=document.getElementById('out-boxqty');if(box)box.value='';}
 }
+/* 다중 입출고 목록: 품목별 금액(수량×단가) + 전체 합계(수량·금액, 통화별) */
+function multiSym(cur){ return (cur||'KRW')==='USD' ? '$' : '₩'; }
+function multiFmtAmt(cur, v){ const n = Number(v)||0; return multiSym(cur) + n.toLocaleString('ko-KR', {maximumFractionDigits: (cur==='USD'?2:0)}); }
+function multiTotals(type){
+  const ls = multiLines[type];
+  const qty = ls.reduce((a,l)=>a+(Number(l.qty)||0),0);
+  const byCur = {};
+  ls.forEach(l => { const c = l.currency||'KRW'; byCur[c] = (byCur[c]||0) + (Number(l.qty)||0)*(Number(l.price)||0); });
+  const amt = Object.entries(byCur).map(([c,v]) => multiFmtAmt(c, v)).join(' + ') || '₩0';
+  return { qty, amt };
+}
+function multiUpdateTotals(type){
+  const t = multiTotals(type);
+  const count = document.getElementById('multi-count-'+type);
+  if(count) count.textContent = multiLines[type].length + '개' + (multiLines[type].length ? ' · ' + t.amt : '');
+  const fq = document.getElementById('multi-foot-qty-'+type), fa = document.getElementById('multi-foot-amt-'+type);
+  if(fq) fq.textContent = '수량 ' + t.qty.toLocaleString();
+  if(fa) fa.textContent = t.amt;
+}
 function multiRender(type){
   const list=document.getElementById('multi-list-'+type);
-  const count=document.getElementById('multi-count-'+type);
   if(!list)return;
-  count.textContent=multiLines[type].length+'개';
   list.replaceChildren();
-  if(!multiLines[type].length){const d=document.createElement('div');d.className='multi-empty';d.textContent='품목을 선택하고 수량을 입력한 뒤 ‘품목 목록에 추가’를 누르세요.';list.append(d);return;}
+  if(!multiLines[type].length){const d=document.createElement('div');d.className='multi-empty';d.textContent='품목을 선택하고 수량을 입력한 뒤 ‘품목 목록에 추가’를 누르세요.';list.append(d);multiUpdateTotals(type);return;}
+  // 머리줄
+  const head=document.createElement('div');head.className='multi-line multi-head';
+  ['품목','수량','단가','금액',''].forEach(t=>{const sp=document.createElement('span');sp.textContent=t;head.append(sp);});
+  list.append(head);
   multiLines[type].forEach((l,i)=>{
     const row=document.createElement('div');row.className='multi-line';
     const name=document.createElement('span');name.textContent=l.code+' · '+l.itemName;
+    const amt=document.createElement('span');amt.className='multi-amt';
+    const showAmt=()=>{ amt.textContent=multiFmtAmt(l.currency,(Number(l.qty)||0)*(Number(l.price)||0)); };
     const qty=document.createElement('input');qty.type='number';qty.min='1';qty.step='1';qty.value=l.qty;qty.title='수량';
-    qty.onchange=()=>{l.qty=Number(qty.value);};
+    qty.oninput=qty.onchange=()=>{l.qty=Number(qty.value);showAmt();multiUpdateTotals(type);};
     const price=document.createElement('input');price.type='number';price.min='0';price.step='0.01';price.value=l.price;price.title='단가';
-    price.onchange=()=>{l.price=Number(price.value);};
-    const currency=document.createElement('span');currency.className='multi-currency';currency.textContent=l.currency;
+    price.oninput=price.onchange=()=>{l.price=Number(price.value);showAmt();multiUpdateTotals(type);};
+    showAmt();
     const del=document.createElement('button');del.type='button';del.className='btn btn-danger btn-sm';del.textContent='×';del.title='목록에서 삭제';
     del.onclick=()=>{multiLines[type].splice(i,1);multiRender(type);};
-    row.append(name,qty,price,currency,del);list.append(row);
+    row.append(name,qty,price,amt,del);list.append(row);
   });
+  // 합계줄
+  const foot=document.createElement('div');foot.className='multi-line multi-foot';
+  const fl=document.createElement('span');fl.textContent='합계 ('+multiLines[type].length+'개 품목)';
+  const fq=document.createElement('span');fq.id='multi-foot-qty-'+type;
+  const fe=document.createElement('span');
+  const fa=document.createElement('span');fa.id='multi-foot-amt-'+type;
+  foot.append(fl,fq,fe,fa,document.createElement('span'));
+  list.append(foot);
+  multiUpdateTotals(type);
 }
 async function multiSave(type){
   const lines=multiLines[type];
