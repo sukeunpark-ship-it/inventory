@@ -2328,7 +2328,7 @@ textarea.form-control{min-height:64px;resize:vertical;}
 /* ── 프로그램 버전 & 새 버전 알림 ──
    GitHub에 새 index.html을 올리면 열려 있는 화면이 5분마다(그리고 창으로 돌아올 때) 확인해서
    상단에 '새 버전' 알림을 띄움 → [지금 적용]을 누르면 새 파일을 받아 바로 적용 (Ctrl+F5 불필요) */
-const APP_VERSION = '2026.11.09-11';
+const APP_VERSION = '2026.11.10-2';
 (function(){
   const lbl = document.getElementById('app-version-label');
   if(lbl) lbl.textContent = '버전 ' + APP_VERSION;
@@ -5752,7 +5752,9 @@ function printStatement(data) {
     `<tr><td></td><td colspan="3"></td><td></td><td></td><td></td><td></td></tr>`
   ).join('');
 
-  const pageSize=13;
+  // 품목이 여러 개면 줄을 2단(형명/코드)으로 촘촘히 하고 한 장에 9줄 → 아래 인수자·공급가·합계 칸이 잘리지 않음
+  const multiRows = allRows.length > 1;
+  const pageSize = multiRows ? 9 : 13, slotCount = multiRows ? 10 : 13;
   const pages=[];
   for(let i=0;i<allRows.length;i+=pageSize)pages.push(allRows.slice(i,i+pageSize));
   function makeSlip(copy, pageRows, pageIndex) {
@@ -5762,7 +5764,9 @@ function printStatement(data) {
       const bcStr=bc===null?'':Number.isInteger(bc)?bc.toLocaleString():bc.toFixed(1);
       return `<tr class="item-row">
         <td colspan="2" class="td-no">${pageIndex*pageSize+i+1}</td>
-        <td colspan="5" class="td-name" style="line-height:1.6;">형명 : ${escSlip(r.itemName)}<br>LG P/No : ${escSlip(r.code||'')}</td>
+        ${multiRows
+          ? `<td colspan="5" class="td-name"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.25;">${escSlip(r.itemName)}</div><div style="font-size:9px;color:#444;line-height:1.2;">LG P/No : ${escSlip(r.code||'')}</div></td>`
+          : `<td colspan="5" class="td-name" style="line-height:1.6;">형명 : ${escSlip(r.itemName)}<br>LG P/No : ${escSlip(r.code||'')}</td>`}
         <td colspan="3" class="td-num">${bq?bq.toLocaleString():''}</td>
         <td colspan="2" class="td-num">${bcStr}</td>
         <td colspan="3" class="td-num">${(Number(r.qty)||0).toLocaleString()}</td>
@@ -5770,7 +5774,7 @@ function printStatement(data) {
         <td colspan="3" class="td-num">${currSym}${(Number(r.amount)||0).toLocaleString()}</td>
       </tr>`;
     }).join('');
-    const blankRows=Array(Math.max(0,pageSize-pageRows.length)).fill(`<tr class="item-row empty">
+    const blankRows=Array(Math.max(0,slotCount-pageRows.length)).fill(`<tr class="item-row empty">
       <td colspan="2" class="td-no"></td><td colspan="5" class="td-name"></td>
       <td colspan="3" class="td-num"></td><td colspan="2" class="td-num"></td>
       <td colspan="3" class="td-num"></td><td colspan="3" class="td-num"></td>
